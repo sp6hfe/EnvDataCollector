@@ -19,7 +19,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if($api_key == $api_upload_key) {
 		// create DB connection
         $db = new mysqli($db_host, $db_user, $db_pass, $db_name);
-		if ($db->connect_errno) {
+		if ($db->connect_error) {
 			echo "DB connection failed: " . $db->connect_error . ".";
 			exit();
 		}
