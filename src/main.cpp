@@ -19,7 +19,7 @@ float humidity = 0.0;
 float pressure_raw = 0.0;
 
 bool measure();
-bool upload();
+bool upload(WiFiClient &wifi);
 void log_measurements();
 
 void setup() {
@@ -63,7 +63,7 @@ void loop() {
 
   if (measure()) {
     log_measurements();
-    if (upload()) {
+    if (upload(wifi_client)) {
       Serial.print(" +");
     } else {
       Serial.print(" -");
@@ -119,39 +119,44 @@ bool measure() {
   return if_measured;
 }
 
-bool upload() {
+bool upload(WiFiClient &wifi) {
   static constexpr int FRACT_SIZE = 2;
   bool if_uploaded = false;
-  char conversion_buffer[8];
+  char conversion_buffer[8]; // max length is pressure: '1020.57' + '\0'
 
-  http_client.begin(wifi_client, config::upload_path);
-  http_client.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  if (http_client.begin(wifi, config::upload_path)) {
+    http_client.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
-  String data_to_upload = "api_key=";
-  data_to_upload += config::api_key;
-  data_to_upload += "&token=";
-  data_to_upload += config::token;
-  data_to_upload += "&temperature=";
-  if (float_to_char(temperature, FRACT_SIZE, conversion_buffer)) {
-    data_to_upload += conversion_buffer;
-    data_to_upload += "&humidity=";
-    if (float_to_char(humidity, FRACT_SIZE, conversion_buffer)) {
+    String data_to_upload = "api_key=";
+    data_to_upload += config::api_key;
+    data_to_upload += "&token=";
+    data_to_upload += config::token;
+    data_to_upload += "&temperature=";
+    if (float_to_char(temperature, FRACT_SIZE, conversion_buffer)) {
       data_to_upload += conversion_buffer;
-      data_to_upload += "pressure_raw=";
-      if (float_to_char(pressure_raw, FRACT_SIZE, conversion_buffer)) {
+      data_to_upload += "&humidity=";
+      if (float_to_char(humidity, FRACT_SIZE, conversion_buffer)) {
         data_to_upload += conversion_buffer;
+        data_to_upload += "&pressure_raw=";
+        if (float_to_char(pressure_raw, FRACT_SIZE, conversion_buffer)) {
+          data_to_upload += conversion_buffer;
 
-        Serial.print(data_to_upload);
+          Serial.print(" ");
+          Serial.print(data_to_upload);
 
-        int post_response = http_client.POST(data_to_upload);
-        if (post_response == 200) {
-          if_uploaded = true;
+          int post_response = http_client.POST(data_to_upload);
+          if (post_response == 200) {
+            if_uploaded = true;
+          } else {
+            Serial.print(" ");
+            Serial.print(post_response);
+          }
         }
       }
     }
-  }
 
-  http_client.end();
+    http_client.end();
+  }
 
   return if_uploaded;
 }
