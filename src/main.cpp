@@ -1,17 +1,26 @@
 #include "config.h"
 #include <Adafruit_BME280.h>
 #include <Arduino.h>
+#include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
-#include <InfluxDb.h>
 #include <Wire.h>
+#include <string>
 
 Adafruit_BME280 bme;
-WiFiClient client;
-Influxdb influx(String(influxdb_host));
+WiFiClient wifi_client;
+HTTPClient http_client;
 // http://cactusprojects.com/esp8266-logging-to-influxdb/
+// https://randomnerdtutorials.com/esp32-esp8266-mysql-database-php/
 // https://randomnerdtutorials.com/esp8266-web-server/
+// https://chintyaw.medium.com/esp32-project-10-insert-data-into-mysql-database-using-php-and-arduino-ide-84601ed91dc
 
-void measure();
+float temperature = 0.0;
+float humidity = 0.0;
+float pressure_raw = 0.0;
+
+bool measure();
+bool upload();
+void log_measurements();
 
 void setup() {
   Serial.begin(9600);
@@ -35,10 +44,10 @@ void setup() {
   Serial.println();
 
   Serial.print("Connecting to WiFi AP: \"");
-  Serial.print(ssid);
+  Serial.print(config::ssid);
   Serial.print("\"");
 
-  WiFi.begin(ssid, pass);
+  WiFi.begin(config::ssid, config::pass);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -52,19 +61,106 @@ void setup() {
 void loop() {
   static constexpr unsigned long INTER_MEASUREMENTS_DELAY_SEC = 30;
 
-  measure();
-  delay(INTER_MEASUREMENTS_DELAY_SEC * 1000);
-}
-
-void measure() {
-  if (bme.takeForcedMeasurement()) {
-    Serial.print(bme.readTemperature());
-    Serial.print(" [*C], ");
-    Serial.print(bme.readHumidity());
-    Serial.print(" [%], ");
-    Serial.print(bme.readPressure() / 100.0F);
-    Serial.println(" [hPa]");
+  if (measure()) {
+    log_measurements();
+    if (upload()) {
+      Serial.print(" +");
+    } else {
+      Serial.print(" -");
+    }
+    Serial.println();
   } else {
     Serial.println("Forced measurement failed.");
   }
+  delay(INTER_MEASUREMENTS_DELAY_SEC * 1000);
+}
+
+bool float_to_ints(float val, int &int_part, int &frac_part, int frac_size) {
+  if (frac_size <= 0) {
+    return false;
+  }
+
+  int_part = static_cast<int>(val);
+  float temp_val = (val - int_part);
+  for (int i = 0; i < frac_size + 1; i++) {
+    temp_val *= 10;
+  }
+  frac_part = static_cast<int>(temp_val);
+  if ((frac_part % 10) >= 5) {
+    frac_part++;
+  }
+  frac_part /= 10;
+
+  return true;
+}
+
+bool float_to_char(float val, int frac_size, char *buffer) {
+  bool if_converted = false;
+  int val_int, val_frac;
+
+  if (float_to_ints(val, val_int, val_frac, frac_size)) {
+    sprintf(buffer, "%d.%d", val_int, val_frac);
+    if_converted = true;
+  }
+
+  return if_converted;
+}
+
+bool measure() {
+  bool if_measured = false;
+
+  if (bme.takeForcedMeasurement()) {
+    temperature = bme.readTemperature();
+    humidity = bme.readHumidity();
+    pressure_raw = bme.readPressure() / 100.0F;
+    if_measured = true;
+  }
+
+  return if_measured;
+}
+
+bool upload() {
+  static constexpr int FRACT_SIZE = 2;
+  bool if_uploaded = false;
+  char conversion_buffer[8];
+
+  http_client.begin(wifi_client, config::upload_path);
+  http_client.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+  String data_to_upload = "api_key=";
+  data_to_upload += config::api_key;
+  data_to_upload += "&token=";
+  data_to_upload += config::token;
+  data_to_upload += "&temperature=";
+  if (float_to_char(temperature, FRACT_SIZE, conversion_buffer)) {
+    data_to_upload += conversion_buffer;
+    data_to_upload += "&humidity=";
+    if (float_to_char(humidity, FRACT_SIZE, conversion_buffer)) {
+      data_to_upload += conversion_buffer;
+      data_to_upload += "pressure_raw=";
+      if (float_to_char(pressure_raw, FRACT_SIZE, conversion_buffer)) {
+        data_to_upload += conversion_buffer;
+
+        Serial.print(data_to_upload);
+
+        int post_response = http_client.POST(data_to_upload);
+        if (post_response == 200) {
+          if_uploaded = true;
+        }
+      }
+    }
+  }
+
+  http_client.end();
+
+  return if_uploaded;
+}
+
+void log_measurements() {
+  Serial.print(temperature);
+  Serial.print(" [*C], ");
+  Serial.print(humidity);
+  Serial.print(" [%], ");
+  Serial.print(pressure_raw);
+  Serial.print(" [hPa]");
 }
