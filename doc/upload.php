@@ -10,11 +10,18 @@ $sensor_id = $api_key = $token = $temperature = $humidity = $pressure_raw = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 	// retrieve parameters
-	$api_key = test_input($_POST["api_key"]);
-	$token = test_input($_POST["token"]);
-	$temperature = test_input($_POST["temperature"]);
-	$humidity = test_input($_POST["humidity"]);
-	$pressure_raw = test_input($_POST["pressure_raw"]);
+	validate_post_data("api_key");
+	$api_key = $_POST["api_key"];
+	validate_post_data("token");
+	$token = $_POST["token"];
+
+	$temperature = $_POST["temperature"];
+	$humidity = $_POST["humidity"];
+	$pressure_raw = $_POST["pressure_raw"];
+	if (empty($temperature) && empty($humidity) && empty($pressure_raw)) {
+		echo "No data to store.";
+		exit();
+	}
 
     if($api_key == $api_upload_key) {
 		// create DB connection
@@ -52,6 +59,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 else {
     echo "No POST data received.";
+}
+
+function validate_post_data($name)
+{
+	if (empty($_POST[$name])) {
+		echo "Missing " . $name . ".";
+		exit();
+	}
 }
 
 ?>
