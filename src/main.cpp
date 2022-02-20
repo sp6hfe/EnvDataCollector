@@ -59,7 +59,7 @@ void setup() {
 }
 
 void loop() {
-  static constexpr unsigned long INTER_MEASUREMENTS_DELAY_SEC = 30;
+  static constexpr unsigned long INTER_MEASUREMENTS_DELAY_SEC = 60;
 
   if (measure()) {
     log_measurements();
