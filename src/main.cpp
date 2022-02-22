@@ -141,16 +141,21 @@ bool upload(WiFiClient &wifi) {
         if (float_to_char(pressure_raw, FRACT_SIZE, conversion_buffer)) {
           data_to_upload += conversion_buffer;
 
-          Serial.print(" ");
+#ifdef DEBUG
+          Serial.println();
           Serial.print(data_to_upload);
+#endif
 
           int post_response = http_client.POST(data_to_upload);
           if (post_response == 200) {
             if_uploaded = true;
-          } else {
+          }
+#ifdef DEBUG
+          else {
             Serial.print(" ");
             Serial.print(post_response);
           }
+#endif
         }
       }
     }
