@@ -9,10 +9,6 @@
 Adafruit_BME280 bme;
 WiFiClient wifi_client;
 HTTPClient http_client;
-// http://cactusprojects.com/esp8266-logging-to-influxdb/
-// https://randomnerdtutorials.com/esp32-esp8266-mysql-database-php/
-// https://randomnerdtutorials.com/esp8266-web-server/
-// https://chintyaw.medium.com/esp32-project-10-insert-data-into-mysql-database-using-php-and-arduino-ide-84601ed91dc
 
 float temperature = 0.0;
 float humidity = 0.0;
@@ -23,6 +19,12 @@ bool upload(WiFiClient &wifi);
 void log_measurements();
 
 void setup() {
+  // cleaning after previous configuration that may be still active
+  WiFi.disconnect();
+  WiFi.mode(WIFI_OFF);
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_AP_STA);
+
   Serial.begin(9600);
   Serial.println();
   Serial.println("**********");
@@ -30,7 +32,6 @@ void setup() {
   Serial.println("**********");
   Serial.println();
 
-  // bool status = bme.begin(0x76);
   bool status = bme.begin(BME280_ADDRESS_ALTERNATE);
   if (!status) {
     Serial.println("Could not find a valid BME280 sensor, check wiring!");
