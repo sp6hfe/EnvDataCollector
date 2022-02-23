@@ -28,7 +28,7 @@ void setup() {
   Serial.begin(9600);
   Serial.println();
   Serial.println("**********");
-  Serial.println("Sensor Data Collector by SP6HFE");
+  Serial.println("Environmental Data Collector by SP6HFE");
   Serial.println("**********");
   Serial.println();
 
