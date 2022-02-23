@@ -2,6 +2,7 @@
 #include <Adafruit_BME280.h>
 #include <Arduino.h>
 #include <ESP8266HTTPClient.h>
+#include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <Wire.h>
 #include <string>
@@ -9,21 +10,25 @@
 Adafruit_BME280 bme;
 WiFiClient wifi_client;
 HTTPClient http_client;
+ESP8266WebServer web_server(80);
 
 float temperature = 0.0;
 float humidity = 0.0;
 float pressure_raw = 0.0;
+bool loop_enabled = false;
 
 bool measure();
 bool upload(WiFiClient &wifi);
 void log_measurements();
+void configure_web_server();
 
 void setup() {
+  static constexpr int WIFI_CONNECT_DELAY_SEC = 10;
+
   // cleaning after previous configuration that may be still active
   WiFi.disconnect();
   WiFi.mode(WIFI_OFF);
   WiFi.persistent(false);
-  WiFi.mode(WIFI_AP_STA);
 
   Serial.begin(9600);
   Serial.println();
@@ -48,32 +53,54 @@ void setup() {
   Serial.print(config::ssid);
   Serial.print("\"");
 
+  WiFi.mode(WIFI_AP_STA);
   WiFi.begin(config::ssid, config::pass);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+  auto counter = 0;
+  while (WiFi.status() != WL_CONNECTED && counter < WIFI_CONNECT_DELAY_SEC) {
     Serial.print(".");
+    delay(1000);
+    ++counter;
   }
-  Serial.println();
-  Serial.print("Connected with IP: ");
-  Serial.println(WiFi.localIP());
-  Serial.println("Starting measurements.");
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println();
+    Serial.print("Connected with IP: ");
+    Serial.println(WiFi.localIP());
+    Serial.println("Starting measurements.");
+  } else {
+    Serial.println();
+    Serial.println("WiFi connection timeout - starting AP.");
+    WiFi.softAP("test", "testtest", 5, 0, 2);
+    Serial.println("");
+    Serial.print("SoftAP IP: ");
+    Serial.println(WiFi.softAPIP());
+    Serial.println("Starting web server.");
+    configure_web_server();
+    web_server.begin();
+    Serial.println("Done.");
+    loop_enabled = false;
+  }
 }
 
 void loop() {
   static constexpr unsigned long INTER_MEASUREMENTS_DELAY_SEC = 60;
 
-  if (measure()) {
-    log_measurements();
-    if (upload(wifi_client)) {
-      Serial.print(" +");
+  if (loop_enabled) {
+    if (measure()) {
+      log_measurements();
+      if (upload(wifi_client)) {
+        Serial.print(" +");
+      } else {
+        Serial.print(" -");
+      }
+      Serial.println();
     } else {
-      Serial.print(" -");
+      Serial.println("Forced measurement failed.");
     }
-    Serial.println();
+    delay(INTER_MEASUREMENTS_DELAY_SEC * 1000);
   } else {
-    Serial.println("Forced measurement failed.");
+    delay(100);
   }
-  delay(INTER_MEASUREMENTS_DELAY_SEC * 1000);
 }
 
 bool float_to_ints(float val, int &int_part, int &frac_part, int frac_size) {
@@ -174,4 +201,45 @@ void log_measurements() {
   Serial.print(" [%], ");
   Serial.print(pressure_raw);
   Serial.print(" [hPa]");
+}
+
+String st;
+String content;
+int statusCode;
+
+void configure_web_server() {
+  web_server.on("/", []() {
+    Serial.println("Client has accessed main page.");
+    IPAddress ip = WiFi.softAPIP();
+    String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) +
+                   '.' + String(ip[3]);
+    content = "<!DOCTYPE HTML>\r\n<html>Hello from ESP8266 at ";
+    content += ipStr;
+    content += "<p>";
+    content += st;
+    content += "</p><form method='get' action='setting'><label>SSID: "
+               "</label><input name='ssid' length=32><input name='pass' "
+               "length=64><input type='submit'></form>";
+    content += "</html>";
+    web_server.send(200, "text/html", content);
+  });
+  web_server.on("/setting", []() {
+    String new_ssid = web_server.arg("ssid");
+    String new_pass = web_server.arg("pass");
+
+    if (new_ssid.length() > 0 && new_pass.length() > 0) {
+      Serial.println("Received data:");
+      Serial.print("ssid: ");
+      Serial.println(new_ssid);
+      Serial.print("pass: ");
+      Serial.println(new_pass);
+      content = "{\"Success\":\"Data received.\"}";
+      statusCode = 200;
+    } else {
+      content = "{\"Error\":\"404 not found\"}";
+      statusCode = 404;
+      Serial.println("Received data not usable. Sending 404.");
+    }
+    web_server.send(statusCode, "application/json", content);
+  });
 }
