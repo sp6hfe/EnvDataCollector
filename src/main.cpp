@@ -15,7 +15,7 @@ ESP8266WebServer web_server(80);
 float temperature = 0.0;
 float humidity = 0.0;
 float pressure_raw = 0.0;
-bool loop_enabled = false;
+bool normal_operation = true;
 
 bool measure();
 bool upload(WiFiClient &wifi);
@@ -78,14 +78,14 @@ void setup() {
     configure_web_server();
     web_server.begin();
     Serial.println("Done.");
-    loop_enabled = false;
+    normal_operation = false;
   }
 }
 
 void loop() {
   static constexpr unsigned long INTER_MEASUREMENTS_DELAY_SEC = 60;
 
-  if (loop_enabled) {
+  if (normal_operation) {
     if (measure()) {
       log_measurements();
       if (upload(wifi_client)) {
@@ -99,7 +99,7 @@ void loop() {
     }
     delay(INTER_MEASUREMENTS_DELAY_SEC * 1000);
   } else {
-    delay(100);
+    web_server.handleClient();
   }
 }
 
@@ -236,10 +236,17 @@ void configure_web_server() {
       content = "{\"Success\":\"Data received.\"}";
       statusCode = 200;
     } else {
+      Serial.println("Received data not usable. Sending 404.");
       content = "{\"Error\":\"404 not found\"}";
       statusCode = 404;
-      Serial.println("Received data not usable. Sending 404.");
     }
     web_server.send(statusCode, "application/json", content);
+  });
+  web_server.on("/restart", []() {
+    Serial.println("Self reset. Bye!");
+    content = "{\"Success\":\"Self reset. Bye!\"}";
+    web_server.send(200, "application/json", content);
+    delay(1000);
+    ESP.restart();
   });
 }
