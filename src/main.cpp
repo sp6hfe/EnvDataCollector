@@ -4,9 +4,6 @@
 #include "wifiCore.h"
 
 Adafruit_BME280 bme;
-WiFiClient wifi_client;
-HTTPClient http_client;
-ESP8266WebServer web_server(80);
 
 float temperature = 0.0;
 float humidity = 0.0;
