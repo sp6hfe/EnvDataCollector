@@ -3,13 +3,21 @@
 #include "config.h"
 #include "wifiCore.h"
 
+enum class OpMode
+{
+  RESTART,
+  MEASUREMENTS,
+  CONFIG,
+};
+
 Adafruit_BME280 bme;
+wrappers::WifiCore wifi_core(Serial, 80);
+
+OpMode op_mode = OpMode::RESTART;
 
 float temperature = 0.0;
 float humidity = 0.0;
 float pressure_raw = 0.0;
-bool normal_operation = true;
-wrappers::WifiCore wifi_core(Serial, 80);
 
 bool measure();
 bool upload();
@@ -54,6 +62,7 @@ void setup()
     Serial.print("Connected with IP: ");
     Serial.println(wifi_core.wifiGetIp());
     Serial.println("Starting measurements.");
+    op_mode = OpMode::MEASUREMENTS;
   }
   else
   {
@@ -68,13 +77,12 @@ void setup()
       configure_web_server();
       wifi_core.webserverBegin();
       Serial.println("Done.");
-      normal_operation = false;
+      op_mode = OpMode::CONFIG;
     }
     else
     {
       Serial.println("AP setup failed. There is no way to communicate wirelessly.");
-      Serial.println("Restarting...");
-      wifi_core.restart();
+      op_mode = OpMode::RESTART;
     }
   }
 }
@@ -83,30 +91,32 @@ void loop()
 {
   static constexpr unsigned long INTER_MEASUREMENTS_DELAY_SEC = 60;
 
-  if (normal_operation)
+  switch (op_mode)
   {
+  case OpMode::MEASUREMENTS:
     if (measure())
     {
       log_measurements();
-      if (upload())
+      if (!upload())
       {
-        Serial.print(" +");
+        Serial.println("Error on data uploading.");
       }
-      else
-      {
-        Serial.print(" -");
-      }
-      Serial.println();
     }
     else
     {
-      Serial.println("Forced measurement failed.");
+      Serial.println("Error on taking measurements.");
     }
     delay(INTER_MEASUREMENTS_DELAY_SEC * 1000);
-  }
-  else
-  {
+    break;
+  case OpMode::CONFIG:
     wifi_core.webserverPerform();
+    break;
+  default:
+    /* fall though */
+  case OpMode::RESTART:
+    Serial.println("Restarting...");
+    wifi_core.restart();
+    break;
   }
 }
 
