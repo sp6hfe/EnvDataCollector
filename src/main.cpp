@@ -1,7 +1,7 @@
 #include <Arduino.h>
-#include <Adafruit_BME280.h>
 #include "config.h"
 #include "wifiCore.h"
+#include "hwBme280.h"
 
 enum class OpMode
 {
@@ -10,16 +10,11 @@ enum class OpMode
   CONFIG,
 };
 
-Adafruit_BME280 bme;
 wrappers::WifiCore wifi_core(Serial, 80);
+wrappers::HwBme280 bme280;
 
 OpMode op_mode = OpMode::RESTART;
 
-float temperature = 0.0;
-float humidity = 0.0;
-float pressure_raw = 0.0;
-
-bool measure();
 bool upload();
 void log_measurements();
 void configure_web_server();
@@ -29,6 +24,9 @@ void restart_web_page();
 
 void setup()
 {
+#ifdef DEBUG
+  delay(1000);
+#endif
   static constexpr uint8_t WIFI_CONNECT_DELAY_SEC = 10;
 
   wifi_core.wifiBegin();
@@ -40,17 +38,16 @@ void setup()
   Serial.println("**********");
   Serial.println();
 
-  bool status = bme.begin(BME280_ADDRESS_ALTERNATE);
-  if (!status)
+  if (bme280.init())
   {
-    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    Serial.println("BME280 sensor detected.");
+  }
+  else
+  {
+    Serial.println("Could not detect a BME280 sensor, check wiring and device address!");
     while (1)
       ;
   }
-  bme.setSampling(Adafruit_BME280::MODE_FORCED, Adafruit_BME280::SAMPLING_X16,
-                  Adafruit_BME280::SAMPLING_X16, Adafruit_BME280::SAMPLING_X16,
-                  Adafruit_BME280::FILTER_OFF, Adafruit_BME280::STANDBY_MS_0_5);
-  Serial.println("BME280 sensor detected.");
 
   Serial.print("Connecting to WiFi AP: \"");
   Serial.print(config::ssid);
@@ -94,7 +91,7 @@ void loop()
   switch (op_mode)
   {
   case OpMode::MEASUREMENTS:
-    if (measure())
+    if (bme280.measure())
     {
       log_measurements();
       if (!upload())
@@ -157,21 +154,6 @@ bool float_to_char(float val, int frac_size, char *buffer)
   return if_converted;
 }
 
-bool measure()
-{
-  bool if_measured = false;
-
-  if (bme.takeForcedMeasurement())
-  {
-    temperature = bme.readTemperature();
-    humidity = bme.readHumidity();
-    pressure_raw = bme.readPressure() / 100.0F;
-    if_measured = true;
-  }
-
-  return if_measured;
-}
-
 bool upload()
 {
   static constexpr int FRACT_SIZE = 2;
@@ -187,15 +169,15 @@ bool upload()
     data_to_upload += "&token=";
     data_to_upload += config::token;
     data_to_upload += "&temperature=";
-    if (float_to_char(temperature, FRACT_SIZE, conversion_buffer))
+    if (float_to_char(bme280.getTemperature(), FRACT_SIZE, conversion_buffer))
     {
       data_to_upload += conversion_buffer;
       data_to_upload += "&humidity=";
-      if (float_to_char(humidity, FRACT_SIZE, conversion_buffer))
+      if (float_to_char(bme280.getHumidity(), FRACT_SIZE, conversion_buffer))
       {
         data_to_upload += conversion_buffer;
         data_to_upload += "&pressure_raw=";
-        if (float_to_char(pressure_raw, FRACT_SIZE, conversion_buffer))
+        if (float_to_char(bme280.getPressureRaw(), FRACT_SIZE, conversion_buffer))
         {
           data_to_upload += conversion_buffer;
 
@@ -214,6 +196,7 @@ bool upload()
           {
             Serial.print(" ");
             Serial.print(post_response);
+            Serial.print(" ");
           }
 #endif
         }
@@ -228,11 +211,11 @@ bool upload()
 
 void log_measurements()
 {
-  Serial.print(temperature);
+  Serial.print(bme280.getTemperature());
   Serial.print(" [*C], ");
-  Serial.print(humidity);
+  Serial.print(bme280.getHumidity());
   Serial.print(" [%], ");
-  Serial.print(pressure_raw);
+  Serial.print(bme280.getPressureRaw());
   Serial.print(" [hPa]");
 }
 
