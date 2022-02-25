@@ -2,6 +2,9 @@
 #include "config.h"
 #include "wifiCore.h"
 #include "hwBme280.h"
+#include "sensorTemperature.h"
+#include "sensorHumidity.h"
+#include "sensorPressureRaw.h"
 
 enum class OpMode
 {
@@ -12,6 +15,10 @@ enum class OpMode
 
 wrappers::WifiCore wifi_core(Serial, 80);
 wrappers::HwBme280 bme280;
+
+sensors::SensorTemperature sensorTemperature(bme280, "temperature");
+sensors::SensorHumidity sensorHumidity(bme280, "humidity");
+sensors::SensorPressureRaw sensorPressureRaw(bme280, "pressure_raw");
 
 OpMode op_mode = OpMode::RESTART;
 
@@ -38,7 +45,7 @@ void setup()
   Serial.println("**********");
   Serial.println();
 
-  if (bme280.init())
+  if (sensorTemperature.init())
   {
     Serial.println("BME280 sensor detected.");
   }
@@ -91,7 +98,7 @@ void loop()
   switch (op_mode)
   {
   case OpMode::MEASUREMENTS:
-    if (bme280.measure())
+    if (sensorTemperature.measure())
     {
       log_measurements();
       if (!upload())
@@ -168,40 +175,49 @@ bool upload()
     data_to_upload += config::api_key;
     data_to_upload += "&token=";
     data_to_upload += config::token;
-    data_to_upload += "&temperature=";
-    if (float_to_char(bme280.getTemperature(), FRACT_SIZE, conversion_buffer))
+
+    if (float_to_char(sensorTemperature.getValue(), FRACT_SIZE, conversion_buffer))
     {
+      data_to_upload += "&";
+      data_to_upload += sensorTemperature.getName();
+      data_to_upload += "=";
       data_to_upload += conversion_buffer;
-      data_to_upload += "&humidity=";
-      if (float_to_char(bme280.getHumidity(), FRACT_SIZE, conversion_buffer))
-      {
-        data_to_upload += conversion_buffer;
-        data_to_upload += "&pressure_raw=";
-        if (float_to_char(bme280.getPressureRaw(), FRACT_SIZE, conversion_buffer))
-        {
-          data_to_upload += conversion_buffer;
-
-#ifdef DEBUG
-          Serial.println();
-          Serial.print(data_to_upload);
-#endif
-
-          int post_response = wifi_core.httpSendPost(data_to_upload);
-          if (post_response == 200)
-          {
-            if_uploaded = true;
-          }
-#ifdef DEBUG
-          else
-          {
-            Serial.print(" ");
-            Serial.print(post_response);
-            Serial.print(" ");
-          }
-#endif
-        }
-      }
     }
+
+    if (float_to_char(sensorHumidity.getValue(), FRACT_SIZE, conversion_buffer))
+    {
+      data_to_upload += "&";
+      data_to_upload += sensorHumidity.getName();
+      data_to_upload += "=";
+      data_to_upload += conversion_buffer;
+    }
+
+    if (float_to_char(sensorPressureRaw.getValue(), FRACT_SIZE, conversion_buffer))
+    {
+      data_to_upload += "&";
+      data_to_upload += sensorPressureRaw.getName();
+      data_to_upload += "=";
+      data_to_upload += conversion_buffer;
+    }
+
+#ifdef DEBUG
+    Serial.println();
+    Serial.print(data_to_upload);
+#endif
+
+    int post_response = wifi_core.httpSendPost(data_to_upload);
+    if (post_response == 200)
+    {
+      if_uploaded = true;
+    }
+#ifdef DEBUG
+    else
+    {
+      Serial.print(" ");
+      Serial.print(post_response);
+      Serial.print(" ");
+    }
+#endif
 
     wifi_core.httpEnd();
   }
@@ -211,11 +227,11 @@ bool upload()
 
 void log_measurements()
 {
-  Serial.print(bme280.getTemperature());
+  Serial.print(sensorTemperature.getValue());
   Serial.print(" [*C], ");
-  Serial.print(bme280.getHumidity());
+  Serial.print(sensorHumidity.getValue());
   Serial.print(" [%], ");
-  Serial.print(bme280.getPressureRaw());
+  Serial.print(sensorPressureRaw.getValue());
   Serial.print(" [hPa]");
 }
 

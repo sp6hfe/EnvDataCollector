@@ -10,9 +10,9 @@ namespace wrappers
         Adafruit_BME280 bme;
         bool is_init = false;
 
-        float temperature = 0.0f;
-        float humidity = 0.0f;
-        float pressure_raw = 0.0f;
+        float temperature = 0.0F;
+        float humidity = 0.0F;
+        float pressure_raw = 0.0F;
         bool new_temperature = false;
         bool new_humidity = false;
         bool new_pressure_raw = false;
@@ -52,6 +52,9 @@ namespace wrappers
     bool HwBme280::measure()
     {
         bool if_measured = false;
+        this->new_temperature = false;
+        this->new_humidity = false;
+        this->new_pressure_raw = false;
 
         if (this->is_init && this->bme.takeForcedMeasurement())
         {
@@ -70,18 +73,18 @@ namespace wrappers
     float HwBme280::getTemperature()
     {
         this->new_temperature = false;
-        return this->is_init ? this->temperature : 0.0f;
+        return this->is_init ? this->temperature : 0.0F;
     };
 
     float HwBme280::getHumidity()
     {
         this->new_humidity = false;
-        return this->is_init ? this->humidity : 0.0f;
+        return this->is_init ? this->humidity : 0.0F;
     }
 
     float HwBme280::getPressureRaw()
     {
         this->new_pressure_raw = false;
-        return this->is_init ? this->pressure_raw : 0.0f;
+        return this->is_init ? this->pressure_raw : 0.0F;
     }
 } // namespace wrappers
