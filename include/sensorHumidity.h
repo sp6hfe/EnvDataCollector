@@ -3,21 +3,23 @@
 #include <ISensor.h>
 #include "hwBme280.h"
 
-namespace sensors
-{
-    class SensorHumidity : public interfaces::ISensor
-    {
-    private:
-        wrappers::HwBme280 &bme280;
-        String name;
+namespace sensors {
 
-    public:
-        bool init() override { return bme280.init(); };
-        bool measure() override { return bme280.measure(); }
-        bool newValue() const override { return bme280.isNewHumidity(); };
-        float getValue() override { return bme280.getHumidity(); }
-        String getName() const override { return name; };
+class SensorHumidity : public interfaces::ISensor {
+ private:
+  wrappers::HwBme280 &bme280;
+  String name;
 
-        SensorHumidity(wrappers::HwBme280 &bme280_, String name_ = "no_humidity_sensor_name") : bme280(bme280_), name(name_){};
-    };
-} // namespace wrappers
+ public:
+  bool init() override { return this->bme280.init(); }
+  bool measure() override { return this->bme280.measure(); }
+  bool newValue() const override { return this->bme280.isNewHumidity(); }
+  float getValue() override { return this->bme280.getHumidity(); }
+  String getName() const override { return this->name; }
+
+  explicit SensorHumidity(wrappers::HwBme280 &bme280_,
+                          String name_ = "no_humidity_sensor_name")
+      : bme280(bme280_), name(name_){};
+};
+
+}  // namespace sensors
