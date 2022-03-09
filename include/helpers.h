@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-namespace application {
+namespace tools {
 
 class Helpers {
  public:
@@ -41,4 +41,4 @@ class Helpers {
   Helpers(){};
 };
 
-}  // namespace application
+}  // namespace tools

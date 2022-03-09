@@ -5,9 +5,11 @@
 #include <ESP8266WiFi.h>
 #include <Stream.h>
 
+#include "IHttp.h"
+
 namespace wrappers {
 
-class WifiCore {
+class WifiCore : public interfaces::IHttp {
  private:
   Stream &console;
   WiFiClient wifi_client;
@@ -68,20 +70,20 @@ class WifiCore {
 
   void webserverPerform() { this->web_server.handleClient(); }
 
-  bool httpBegin(const String &url) {
+  bool httpBegin(const String &url) override {
     return this->http_client.begin(this->wifi_client, url);
   }
 
   void httpAddHeader(const String &name, const String &value,
-                     bool first = false, bool replace = true) {
+                     bool first = false, bool replace = true) override {
     this->http_client.addHeader(name, value, first, replace);
   }
 
-  int httpSendPost(const String &payload) {
+  int httpSendPost(const String &payload) override {
     return this->http_client.POST(payload);
   }
 
-  void httpEnd() { this->http_client.end(); }
+  void httpEnd() override { this->http_client.end(); }
 
   explicit WifiCore(Stream &console_, uint16_t web_server_port_)
       : console(console_), web_server(web_server_port_){};

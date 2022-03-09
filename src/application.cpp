@@ -1,6 +1,6 @@
 #include "application.h"
+
 #include "config.h"
-#include "helpers.h"
 
 using namespace application;
 
@@ -97,64 +97,18 @@ bool Application::upload_link_ready(const char *wifi_ssid,
 }
 
 bool Application::upload_data() {
-  static constexpr int FRACT_SIZE = 2;
-  bool if_uploaded = false;
-  char conversion_buffer[8];  // max length is pressure: '1020.57' + '\0'
+  this->dataUploader.clearData();
 
-  if (this->wifiCore.httpBegin(config::upload_path)) {
-    this->wifiCore.httpAddHeader("Content-Type",
-                                 "application/x-www-form-urlencoded");
+  this->dataUploader.addData(this->sensorTemperature.getName(),
+                             this->sensorTemperature.getValue());
 
-    String data_to_upload = "api_key=";
-    data_to_upload += config::api_key;
-    data_to_upload += "&token=";
-    data_to_upload += config::token;
+  this->dataUploader.addData(this->sensorHumidity.getName(),
+                             this->sensorHumidity.getValue());
 
-    if (Helpers::floatToChar(this->sensorTemperature.getValue(), FRACT_SIZE,
-                             conversion_buffer)) {
-      data_to_upload += "&";
-      data_to_upload += this->sensorTemperature.getName();
-      data_to_upload += "=";
-      data_to_upload += conversion_buffer;
-    }
+  this->dataUploader.addData(this->sensorPressureRaw.getName(),
+                             this->sensorPressureRaw.getValue());
 
-    if (Helpers::floatToChar(this->sensorHumidity.getValue(), FRACT_SIZE,
-                             conversion_buffer)) {
-      data_to_upload += "&";
-      data_to_upload += this->sensorHumidity.getName();
-      data_to_upload += "=";
-      data_to_upload += conversion_buffer;
-    }
-
-    if (Helpers::floatToChar(this->sensorPressureRaw.getValue(), FRACT_SIZE,
-                             conversion_buffer)) {
-      data_to_upload += "&";
-      data_to_upload += this->sensorPressureRaw.getName();
-      data_to_upload += "=";
-      data_to_upload += conversion_buffer;
-    }
-
-#ifdef DEBUG
-    this->console.print(data_to_upload);
-#endif
-
-    int post_response = this->wifiCore.httpSendPost(data_to_upload);
-    if (post_response == 200) {
-      if_uploaded = true;
-    }
-#ifdef DEBUG
-    else {
-      this->console.print(" ");
-      this->console.print(post_response);
-    }
-
-    this->console.println();
-#endif
-
-    this->wifiCore.httpEnd();
-  }
-
-  return if_uploaded;
+  return this->dataUploader.upload();
 }
 
 bool Application::setup() {
@@ -194,6 +148,9 @@ bool Application::setup() {
         "Could not initialize pressure sansor. Check wiring and device "
         "address!");
   }
+
+  // init data uploader
+  this->dataUploader.begin(config::upload_path, config::api_key, config::token);
 
   // connect to wifi by default
   if (this->upload_link_ready(config::ssid, config::pass,

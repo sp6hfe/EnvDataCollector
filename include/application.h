@@ -1,7 +1,9 @@
 #pragma once
 
 #include <Stream.h>
+
 #include "ISensor.h"
+#include "httpUploader.h"
 #include "wifiCore.h"
 
 namespace application {
@@ -20,6 +22,7 @@ class Application {
   interfaces::ISensor &sensorTemperature;
   interfaces::ISensor &sensorHumidity;
   interfaces::ISensor &sensorPressureRaw;
+  wrappers::HttpUploader dataUploader;
 
   void root_web_page();
   void config_web_page();
@@ -42,7 +45,8 @@ class Application {
         wifiCore(wifiCore_),
         sensorTemperature(sensorTemperature_),
         sensorHumidity(sensorHumidity_),
-        sensorPressureRaw(sensorPressureRaw_){};
+        sensorPressureRaw(sensorPressureRaw_),
+        dataUploader(console, wifiCore){};
 };
 
 }  // namespace application
