@@ -39,6 +39,8 @@ class WifiCore {
     return (WiFi.status() == WL_CONNECTED);
   }
 
+  bool wifiConnected() { return WiFi.isConnected(); }
+
   IPAddress wifiGetIp() { return WiFi.localIP(); }
 
   bool apBegin(const char *ssid, const char *psk, int channel, int ssid_hidden,
