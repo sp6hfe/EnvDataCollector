@@ -26,6 +26,8 @@ class Application {
   void restart_web_page();
   void configure_web_server();
   void log_measurements();
+  bool upload_link_ready(const char *wifi_ssid, const char *wifi_passphrase,
+                         const uint8_t timeout_sec);
   bool upload_data();
 
  public:

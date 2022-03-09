@@ -68,7 +68,32 @@ void Application::log_measurements() {
   this->console.print(this->sensorHumidity.getValue());
   this->console.print(" [%], ");
   this->console.print(this->sensorPressureRaw.getValue());
-  this->console.print(" [hPa]");
+  this->console.println(" [hPa]");
+}
+
+bool Application::upload_link_ready(const char *wifi_ssid,
+                                    const char *wifi_passphrase,
+                                    const uint8_t timeout_sec) {
+  bool if_link_active = true;
+
+  if (!this->wifiCore.wifiConnected()) {
+    this->console.print("Connecting to WiFi AP: \"");
+    this->console.print(wifi_ssid);
+    this->console.print("\"");
+    this->wifiCore.wifiBegin();
+
+    if (!this->wifiCore.wifiConnect(wifi_ssid, wifi_passphrase, timeout_sec)) {
+      this->console.println();
+      if_link_active = false;
+    } else {
+      this->console.println();
+      this->console.print("Connected with IP: ");
+      this->console.print(this->wifiCore.wifiGetIp());
+      this->console.println(".");
+    }
+  }
+
+  return if_link_active;
 }
 
 bool Application::upload_data() {
@@ -110,7 +135,6 @@ bool Application::upload_data() {
     }
 
 #ifdef DEBUG
-    this->console.println();
     this->console.print(data_to_upload);
 #endif
 
@@ -122,8 +146,9 @@ bool Application::upload_data() {
     else {
       this->console.print(" ");
       this->console.print(post_response);
-      this->console.print(" ");
     }
+
+    this->console.println();
 #endif
 
     this->wifiCore.httpEnd();
@@ -171,14 +196,8 @@ bool Application::setup() {
   }
 
   // connect to wifi by default
-  this->console.print("Connecting to WiFi AP: \"");
-  this->console.print(config::ssid);
-  this->console.print("\"");
-  if (this->wifiCore.wifiConnect(config::ssid, config::pass,
-                                 config::wifi_connect_timeout_sec)) {
-    this->console.println();
-    this->console.print("Connected with IP: ");
-    this->console.println(this->wifiCore.wifiGetIp());
+  if (this->upload_link_ready(config::ssid, config::pass,
+                              config::wifi_connect_timeout_sec)) {
     this->console.println("Starting measurements.");
     this->opMode = OpMode::MEASUREMENTS;
   } else {
@@ -209,15 +228,26 @@ bool Application::setup() {
 void Application::loop() {
   switch (this->opMode) {
     case OpMode::MEASUREMENTS:
-      if (this->sensorTemperature.measure()) {
-        this->log_measurements();
-        if (!this->upload_data()) {
-          this->console.println("Error on data uploading.");
+      // deal with WiFi first not to delay upload after measurements
+      {
+        bool link_ready = this->upload_link_ready(
+            config::ssid, config::pass, config::wifi_connect_timeout_sec);
+
+        if (this->sensorTemperature.measure()) {
+          // for BME280 measurement of one parameter give all readouts
+          this->log_measurements();
+          if (!link_ready) {
+            this->console.println("Can't upload data due to WiFi link down.");
+          } else {
+            if (!this->upload_data()) {
+              this->console.println("Error on data uploading.");
+            }
+          }
+        } else {
+          this->console.println("Error on taking measurements.");
         }
-      } else {
-        this->console.println("Error on taking measurements.");
+        delay(config::inter_measurements_delay_sec * 1000);
       }
-      delay(config::inter_measurements_delay_sec * 1000);
       break;
     case OpMode::CONFIG:
       this->wifiCore.webserverPerform();
