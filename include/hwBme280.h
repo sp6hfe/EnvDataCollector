@@ -18,7 +18,7 @@ class HwBme280 {
 
  public:
   bool init(uint8_t address = BME280_ADDRESS_ALTERNATE) {
-    is_init = false;
+    this->is_init = false;
 
     if (this->bme.begin(address)) {
       this->bme.setSampling(
