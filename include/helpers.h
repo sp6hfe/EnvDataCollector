@@ -26,12 +26,12 @@ class Helpers {
     return true;
   }
 
-  static bool floatToChar(float val, int frac_size, char *buffer) {
+  static bool floatToChar(float val, char *buffer) {
     bool if_converted = false;
     int val_int, val_frac;
 
-    if (floatToInts(val, val_int, val_frac, frac_size)) {
-      sprintf(buffer, "%d.%d", val_int, val_frac);
+    if (floatToInts(val, val_int, val_frac, 2)) {
+      sprintf(buffer, "%d.%02d", val_int, val_frac);
       if_converted = true;
     }
 

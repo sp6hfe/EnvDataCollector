@@ -10,7 +10,6 @@ namespace wrappers {
 
 class HttpUploader : public interfaces::IDataUploader {
  private:
-  static constexpr int FRACT_SIZE = 2;
   char floatToCharConversionBuffer[8];  // max length is pressure: '1020.57' +
                                         // '\0'
 
@@ -43,8 +42,7 @@ class HttpUploader : public interfaces::IDataUploader {
   bool addData(const String name, const float value) override {
     bool ifDataAdded = false;
 
-    if (tools::Helpers::floatToChar(value, FRACT_SIZE,
-                                    floatToCharConversionBuffer)) {
+    if (tools::Helpers::floatToChar(value, floatToCharConversionBuffer)) {
       this->dataToUpload += "&";
       this->dataToUpload += name;
       this->dataToUpload += "=";
