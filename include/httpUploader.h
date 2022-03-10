@@ -74,8 +74,6 @@ class HttpUploader : public interfaces::IDataUploader {
         this->console.print(" ");
         this->console.print(postResponseCode);
       }
-
-      this->console.println();
 #endif
 
       this->httpCore.httpEnd();
