@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Stream.h>
+#include <vector>
 
 #include "ISensor.h"
 #include "httpUploader.h"
@@ -19,10 +20,8 @@ class Application {
   OpMode opMode = OpMode::RESTART;
   Stream &console;
   wrappers::WifiCore &wifiCore;
-  interfaces::ISensor &sensorTemperature;
-  interfaces::ISensor &sensorHumidity;
-  interfaces::ISensor &sensorPressureRaw;
   wrappers::HttpUploader dataUploader;
+  std::vector<interfaces::ISensor *> sensorSet;
 
   void root_web_page();
   void config_web_page();
@@ -34,18 +33,13 @@ class Application {
   bool upload_data();
 
  public:
+  bool registerSensor(interfaces::ISensor *sensor);
   bool setup();
-  void loop();
+  void loop(unsigned long loop_enter_millis);
 
-  explicit Application(Stream &console_, wrappers::WifiCore &wifiCore_,
-                       interfaces::ISensor &sensorTemperature_,
-                       interfaces::ISensor &sensorHumidity_,
-                       interfaces::ISensor &sensorPressureRaw_)
+  explicit Application(Stream &console_, wrappers::WifiCore &wifiCore_)
       : console(console_),
         wifiCore(wifiCore_),
-        sensorTemperature(sensorTemperature_),
-        sensorHumidity(sensorHumidity_),
-        sensorPressureRaw(sensorPressureRaw_),
         dataUploader(console, wifiCore){};
 };
 

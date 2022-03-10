@@ -63,12 +63,15 @@ void Application::configure_web_server() {
 }
 
 void Application::log_measurements() {
-  this->console.print(this->sensorTemperature.getValue());
-  this->console.print(" [*C], ");
-  this->console.print(this->sensorHumidity.getValue());
-  this->console.print(" [%], ");
-  this->console.print(this->sensorPressureRaw.getValue());
-  this->console.println(" [hPa]");
+  this->console.print("Measurements:");
+  for (auto sensor : this->sensorSet) {
+    this->console.print(" ");
+    this->console.print(sensor->getValue());
+    this->console.print("[");
+    this->console.print(sensor->getUnit());
+    this->console.print("]");
+  }
+  this->console.println();
 }
 
 bool Application::upload_link_ready(const char *wifi_ssid,
@@ -99,16 +102,35 @@ bool Application::upload_link_ready(const char *wifi_ssid,
 bool Application::upload_data() {
   this->dataUploader.clearData();
 
-  this->dataUploader.addData(this->sensorTemperature.getName(),
-                             this->sensorTemperature.getValue());
-
-  this->dataUploader.addData(this->sensorHumidity.getName(),
-                             this->sensorHumidity.getValue());
-
-  this->dataUploader.addData(this->sensorPressureRaw.getName(),
-                             this->sensorPressureRaw.getValue());
+  for (auto sensor : this->sensorSet) {
+    this->dataUploader.addData(sensor->getName(), sensor->getValue());
+  }
 
   return this->dataUploader.upload();
+}
+
+bool Application::registerSensor(interfaces::ISensor *sensor) {
+  bool ifSensorRegistered = false;
+
+  if (sensor) {
+    // add only new sensor
+    bool sensorNotRegisteredYet = true;
+    for (std::vector<interfaces::ISensor *>::iterator it =
+             this->sensorSet.begin();
+         it != this->sensorSet.end(); it++) {
+      if (*it == sensor) {
+        sensorNotRegisteredYet = false;
+        break;
+      }
+    }
+
+    if (sensorNotRegisteredYet) {
+      this->sensorSet.push_back(sensor);
+      ifSensorRegistered = true;
+    }
+  }
+
+  return ifSensorRegistered;
 }
 
 bool Application::setup() {
@@ -125,28 +147,16 @@ bool Application::setup() {
   this->console.println();
 
   // init all sensors
-  if (this->sensorTemperature.init()) {
-    this->console.println("Temperature sensor initialized.");
-  } else {
-    this->console.println(
-        "Could not initialize temperature sansor. Check wiring and device "
-        "address!");
-  }
-
-  if (this->sensorHumidity.init()) {
-    this->console.println("Humidity sensor initialized.");
-  } else {
-    this->console.println(
-        "Could not initialize humidity sansor. Check wiring and device "
-        "address!");
-  }
-
-  if (this->sensorPressureRaw.init()) {
-    this->console.println("Pressure sensor initialized.");
-  } else {
-    this->console.println(
-        "Could not initialize pressure sansor. Check wiring and device "
-        "address!");
+  for (auto sensor : this->sensorSet) {
+    if (sensor->init()) {
+      this->console.print("Sensor \"");
+      this->console.print(sensor->getName());
+      this->console.println("\" initialized.");
+    } else {
+      this->console.print("Could not initialize \"");
+      this->console.print(sensor->getName());
+      this->console.println("\" sensor. Check wiring and device address!");
+    }
   }
 
   // init data uploader
@@ -182,7 +192,7 @@ bool Application::setup() {
   return if_setup_ok;
 }
 
-void Application::loop() {
+void Application::loop(unsigned long loop_enter_millis) {
   switch (this->opMode) {
     case OpMode::MEASUREMENTS:
       // deal with WiFi first not to delay upload after measurements
@@ -190,19 +200,25 @@ void Application::loop() {
         bool link_ready = this->upload_link_ready(
             config::ssid, config::pass, config::wifi_connect_timeout_sec);
 
-        if (this->sensorTemperature.measure()) {
-          // for BME280 measurement of one parameter give all readouts
-          this->log_measurements();
-          if (!link_ready) {
-            this->console.println("Can't upload data due to WiFi link down.");
-          } else {
-            if (!this->upload_data()) {
-              this->console.println("Error on data uploading.");
-            }
+        // collect measurements
+        for (auto sensor : this->sensorSet) {
+          if (!sensor->measure(loop_enter_millis)) {
+            this->console.print("Error taking measurements with \"");
+            this->console.print(sensor->getName());
+            this->console.println("\" sensor.");
           }
-        } else {
-          this->console.println("Error on taking measurements.");
         }
+
+        // for BME280 measurement of one parameter give all readouts
+        this->log_measurements();
+        if (!link_ready) {
+          this->console.println("Can't upload data due to WiFi link down.");
+        } else {
+          if (!this->upload_data()) {
+            this->console.println("Error on data uploading.");
+          }
+        }
+
         delay(config::inter_measurements_delay_sec * 1000);
       }
       break;

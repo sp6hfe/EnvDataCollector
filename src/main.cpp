@@ -9,16 +9,15 @@
 
 /* sensors */
 wrappers::HwBme280 bme280;
-sensors::SensorTemperature sensorTemperature(bme280, "temperature");
-sensors::SensorHumidity sensorHumidity(bme280, "humidity");
-sensors::SensorPressureRaw sensorPressureRaw(bme280, "pressure_raw");
+sensors::SensorTemperature sensorTemperature(bme280, "temperature", "*C");
+sensors::SensorHumidity sensorHumidity(bme280, "humidity", "%");
+sensors::SensorPressureRaw sensorPressureRaw(bme280, "pressure_raw", "hPa");
 
 /* wifi */
 wrappers::WifiCore wifiCore(Serial, config::web_server_port);
 
 /* app */
-application::Application app(Serial, wifiCore, sensorTemperature,
-                             sensorHumidity, sensorPressureRaw);
+application::Application app(Serial, wifiCore);
 
 void setup() {
 #ifdef DEBUG
@@ -29,9 +28,12 @@ void setup() {
 
   Serial.begin(config::console_baudrate);
   Serial.println();
+  app.registerSensor(&sensorTemperature);
+  app.registerSensor(&sensorHumidity);
+  app.registerSensor(&sensorPressureRaw);
   if (!app.setup()) {
     Serial.println("Application setup failed. Investigate log for failures.");
   }
 }
 
-void loop() { app.loop(); }
+void loop() { app.loop(millis()); }
