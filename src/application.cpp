@@ -4,7 +4,7 @@
 
 using namespace application;
 
-void Application::root_web_page() {
+void Application::webPageRoot() {
   this->console.println("Client has accessed main page.");
   IPAddress ip = this->wifiCore.apGetIp();
   String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) +
@@ -21,29 +21,29 @@ void Application::root_web_page() {
   this->wifiCore.webserverSend(200, "text/html", content);
 }
 
-void Application::config_web_page() {
-  String new_ssid = this->wifiCore.webserverGetArg("ssid");
-  String new_pass = this->wifiCore.webserverGetArg("pass");
+void Application::webPageConfig() {
+  String newSsid = this->wifiCore.webserverGetArg("ssid");
+  String newPassphrase = this->wifiCore.webserverGetArg("pass");
   String content;
-  int web_server_status_code = 200;
+  int webserverStatusCode = 200;
 
-  if (new_ssid.length() > 0 && new_pass.length() > 0) {
+  if (newSsid.length() > 0 && newPassphrase.length() > 0) {
     this->console.println("Received data:");
     this->console.print("ssid: ");
-    this->console.println(new_ssid);
+    this->console.println(newSsid);
     this->console.print("pass: ");
-    this->console.println(new_pass);
+    this->console.println(newPassphrase);
     content = "{\"Success\":\"Data received.\"}";
   } else {
     this->console.println("Received data not usable. Sending 404.");
     content = "{\"Error\":\"404 not found\"}";
-    web_server_status_code = 404;
+    webserverStatusCode = 404;
   }
-  this->wifiCore.webserverSend(web_server_status_code, "application/json",
+  this->wifiCore.webserverSend(webserverStatusCode, "application/json",
                                content);
 }
 
-void Application::restart_web_page() {
+void Application::webPageRestart() {
   String content = "{\"Success\":\"Self reset. Bye!\"}";
   this->console.println("Self reset. Bye!");
   this->wifiCore.webserverSend(200, "application/json", content);
@@ -53,41 +53,29 @@ void Application::restart_web_page() {
   this->wifiCore.restart();
 }
 
-void Application::configure_web_server() {
+void Application::webserverConfig() {
   this->wifiCore.webserverRegisterPage(
-      "/", [this]() -> void { this->root_web_page(); });
+      "/", [this]() -> void { this->webPageRoot(); });
   this->wifiCore.webserverRegisterPage(
-      "/config", [this]() -> void { this->config_web_page(); });
+      "/config", [this]() -> void { this->webPageConfig(); });
   this->wifiCore.webserverRegisterPage(
-      "/restart", [this]() -> void { this->restart_web_page(); });
+      "/restart", [this]() -> void { this->webPageRestart(); });
 }
 
-void Application::log_measurements() {
-  this->console.print("Measurements:");
-  for (auto sensor : this->sensorSet) {
-    this->console.print(" ");
-    this->console.print(sensor->getValue());
-    this->console.print("[");
-    this->console.print(sensor->getUnit());
-    this->console.print("]");
-  }
-  this->console.println();
-}
-
-bool Application::upload_link_ready(const char *wifi_ssid,
-                                    const char *wifi_passphrase,
-                                    const uint8_t timeout_sec) {
-  bool if_link_active = true;
+bool Application::uploadLinkReady(const char *wifiSsid,
+                                  const char *wifiPassphrase,
+                                  const uint8_t timeoutSec) {
+  bool ifLinkActive = true;
 
   if (!this->wifiCore.wifiConnected()) {
     this->console.print("Connecting to WiFi AP: \"");
-    this->console.print(wifi_ssid);
+    this->console.print(wifiSsid);
     this->console.print("\"");
     this->wifiCore.wifiBegin();
 
-    if (!this->wifiCore.wifiConnect(wifi_ssid, wifi_passphrase, timeout_sec)) {
+    if (!this->wifiCore.wifiConnect(wifiSsid, wifiPassphrase, timeoutSec)) {
       this->console.println();
-      if_link_active = false;
+      ifLinkActive = false;
     } else {
       this->console.println();
       this->console.print("Connected with IP: ");
@@ -96,17 +84,52 @@ bool Application::upload_link_ready(const char *wifi_ssid,
     }
   }
 
-  return if_link_active;
+  return ifLinkActive;
 }
 
-bool Application::upload_data() {
+bool Application::logAndUpload(bool uploadAllowed) {
+  bool anyNewMeasurement = false;
+  bool logAndUploadResult = false;
+
   this->dataUploader.clearData();
+  this->console.print("Measurements:");
 
   for (auto sensor : this->sensorSet) {
-    this->dataUploader.addData(sensor->getName(), sensor->getValue());
-  }
+    if (sensor->newValue()) {
+      // assumption here is that we want to upload only new measurements and
+      // newValue() returns false after first readout with getValue()
+      if (uploadAllowed) {
+        this->dataUploader.addData(sensor->getName(), sensor->getValue());
+      }
 
-  return this->dataUploader.upload();
+      this->console.print(" ");
+      this->console.print(sensor->getValue());
+      this->console.print("[");
+      this->console.print(sensor->getUnit());
+      this->console.print("]");
+      anyNewMeasurement = true;
+    }
+  }
+  this->console.print(" ");
+
+  if (!anyNewMeasurement) {
+    // nothing to log/upload
+    this->console.print("no new measurements - check log for errors");
+  } else if (uploadAllowed) {
+    // new logged measurements queued for upload
+    if (this->dataUploader.upload()) {
+      this->console.print(" (+)");
+      logAndUploadResult = true;
+    } else {
+      this->console.print(" (-)");
+    }
+  } else {
+    // new measurements logged
+    logAndUploadResult = true;
+  }
+  this->console.println(".");
+
+  return logAndUploadResult;
 }
 
 bool Application::registerSensor(interfaces::ISensor *sensor) {
@@ -134,7 +157,7 @@ bool Application::registerSensor(interfaces::ISensor *sensor) {
 }
 
 bool Application::setup() {
-  bool if_setup_ok = true;
+  bool ifSetupOk = true;
 
   // reset wifi state
   this->wifiCore.wifiBegin();
@@ -163,8 +186,8 @@ bool Application::setup() {
   this->dataUploader.begin(config::upload_path, config::api_key, config::token);
 
   // connect to wifi by default
-  if (this->upload_link_ready(config::ssid, config::pass,
-                              config::wifi_connect_timeout_sec)) {
+  if (this->uploadLinkReady(config::ssid, config::pass,
+                            config::wifi_connect_timeout_sec)) {
     this->console.println("Starting measurements.");
     this->opMode = OpMode::MEASUREMENTS;
   } else {
@@ -185,38 +208,36 @@ bool Application::setup() {
       this->console.println(
           "AP setup failed. There is no way to communicate wirelessly.");
       this->opMode = OpMode::RESTART;
-      if_setup_ok = false;
+      ifSetupOk = false;
     }
   }
 
-  return if_setup_ok;
+  return ifSetupOk;
 }
 
-void Application::loop(unsigned long loop_enter_millis) {
+void Application::loop(unsigned long loopEnterMillis) {
   switch (this->opMode) {
     case OpMode::MEASUREMENTS:
       // deal with WiFi first not to delay upload after measurements
       {
-        bool link_ready = this->upload_link_ready(
+        bool linkReady = this->uploadLinkReady(
             config::ssid, config::pass, config::wifi_connect_timeout_sec);
 
         // collect measurements
         for (auto sensor : this->sensorSet) {
-          if (!sensor->measure(loop_enter_millis)) {
+          if (!sensor->measure(loopEnterMillis)) {
             this->console.print("Error taking measurements with \"");
             this->console.print(sensor->getName());
             this->console.println("\" sensor.");
           }
         }
 
-        // for BME280 measurement of one parameter give all readouts
-        this->log_measurements();
-        if (!link_ready) {
+        if (!linkReady) {
           this->console.println("Can't upload data due to WiFi link down.");
-        } else {
-          if (!this->upload_data()) {
-            this->console.println("Error on data uploading.");
-          }
+        }
+
+        if (!this->logAndUpload(linkReady)) {
+          this->console.println("Error on data logging/uploading.");
         }
 
         delay(config::inter_measurements_delay_sec * 1000);
