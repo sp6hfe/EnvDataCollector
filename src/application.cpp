@@ -14,7 +14,7 @@ void Application::webPageRoot() {
   content += "<p>";
   //   this->webContent += st;
   content +=
-      "</p><form method='get' action='setting'><label>SSID: "
+      "</p><form method='get' action='config'><label>SSID: "
       "</label><input name='ssid' length=32><input name='pass' "
       "length=64><input type='submit'></form>";
   content += "</html>";
@@ -200,7 +200,7 @@ bool Application::setup() {
       this->console.print("AP IP: ");
       this->console.println(this->wifiCore.apGetIp());
       this->console.println("Starting web server.");
-      //   configure_web_server();
+      this->webserverConfig();
       this->wifiCore.webserverBegin();
       this->console.println("Done.");
       this->opMode = OpMode::CONFIG;
