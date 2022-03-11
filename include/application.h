@@ -4,8 +4,8 @@
 
 #include <vector>
 
+#include "IDataUploader.h"
 #include "ISensor.h"
-#include "httpUploader.h"
 #include "wifiCore.h"
 
 namespace application {
@@ -21,8 +21,8 @@ class Application {
   OpMode opMode = OpMode::RESTART;
   Stream &console;
   wrappers::WifiCore &wifiCore;
-  wrappers::HttpUploader dataUploader;
   std::vector<interfaces::ISensor *> sensorSet;
+  std::vector<interfaces::IDataUploader *> uploaderSet;
 
   void webPageRoot();
   void webPageConfig();
@@ -33,14 +33,13 @@ class Application {
   bool logAndUpload(bool logOnly);
 
  public:
-  bool registerSensor(interfaces::ISensor *sensor);
+  bool registerSensor(interfaces::ISensor *newSensor);
+  bool registerUploader(interfaces::IDataUploader *newUploader);
   bool setup();
   void loop(unsigned long loopEnterMillis);
 
   explicit Application(Stream &console_, wrappers::WifiCore &wifiCore_)
-      : console(console_),
-        wifiCore(wifiCore_),
-        dataUploader(console, wifiCore){};
+      : console(console_), wifiCore(wifiCore_) {}
 };
 
 }  // namespace application

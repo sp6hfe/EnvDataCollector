@@ -91,7 +91,10 @@ bool Application::logAndUpload(bool uploadAllowed) {
   bool anyNewMeasurement = false;
   bool logAndUploadResult = false;
 
-  this->dataUploader.clearData();
+  for (auto uploader : this->uploaderSet) {
+    uploader->clearData();
+  }
+
   this->console.println();
   this->console.print("New measurements:");
 
@@ -100,7 +103,9 @@ bool Application::logAndUpload(bool uploadAllowed) {
       // assumption here is that we want to upload only new measurements and
       // newValue() returns false after first readout with getValue()
       if (uploadAllowed) {
-        this->dataUploader.addData(sensor->getDataId(), sensor->getData());
+        for (auto uploader : this->uploaderSet) {
+          uploader->addData(sensor->getDataId(), sensor->getData());
+        }
       }
 
       this->console.println();
@@ -118,14 +123,24 @@ bool Application::logAndUpload(bool uploadAllowed) {
     // nothing to log/upload
     this->console.println(" no new measurements - check log for errors.");
   } else if (uploadAllowed) {
-    // new logged measurements queued for upload
     this->console.println();
-    if (this->dataUploader.upload()) {
-      this->console.println();
-      this->console.println("(+) Data uploaded.");
+    // new logged measurements queued for upload
+    auto succeededUploads = 0;
+    for (auto uploader : this->uploaderSet) {
+      if (uploader->upload()) {
+        succeededUploads++;
+        this->console.print("(+) Data uploaded");
+        logAndUploadResult = true;
+      } else {
+        this->console.print("(-) Error uploading");
+      }
+      this->console.print(" via \"");
+      this->console.print(uploader->getName());
+      this->console.println("\".");
+    }
+    // success if any data went through
+    if (succeededUploads) {
       logAndUploadResult = true;
-    } else {
-      this->console.println("(-) Error uploading data.");
     }
   } else {
     // new measurements logged
@@ -135,28 +150,48 @@ bool Application::logAndUpload(bool uploadAllowed) {
   return logAndUploadResult;
 }
 
-bool Application::registerSensor(interfaces::ISensor *sensor) {
+bool Application::registerSensor(interfaces::ISensor *newSensor) {
   bool ifSensorRegistered = false;
 
-  if (sensor) {
+  if (newSensor) {
     // add only new sensor
     bool sensorNotRegisteredYet = true;
-    for (std::vector<interfaces::ISensor *>::iterator it =
-             this->sensorSet.begin();
-         it != this->sensorSet.end(); it++) {
-      if (*it == sensor) {
+    for (auto sensor : this->sensorSet) {
+      if (sensor == newSensor) {
         sensorNotRegisteredYet = false;
         break;
       }
     }
 
     if (sensorNotRegisteredYet) {
-      this->sensorSet.push_back(sensor);
+      this->sensorSet.push_back(newSensor);
       ifSensorRegistered = true;
     }
   }
 
   return ifSensorRegistered;
+}
+
+bool Application::registerUploader(interfaces::IDataUploader *newUploader) {
+  bool ifUploaderRegistered = false;
+
+  if (newUploader) {
+    // add only new uploader
+    bool uploaderNotRegisteredYet = true;
+    for (auto uploader : this->uploaderSet) {
+      if (uploader == newUploader) {
+        uploaderNotRegisteredYet = false;
+        break;
+      }
+    }
+
+    if (uploaderNotRegisteredYet) {
+      this->uploaderSet.push_back(newUploader);
+      ifUploaderRegistered = true;
+    }
+  }
+
+  return ifUploaderRegistered;
 }
 
 bool Application::setup() {
@@ -184,9 +219,6 @@ bool Application::setup() {
       this->console.println("\" sensor. Check wiring and device address!");
     }
   }
-
-  // init data uploader
-  this->dataUploader.begin(config::upload_path, config::api_key, config::token);
 
   // connect to wifi by default
   if (this->uploadLinkReady(config::ssid, config::pass,

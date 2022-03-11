@@ -6,7 +6,7 @@
 #include "IHttp.h"
 #include "helpers.h"
 
-namespace wrappers {
+namespace uploaders {
 
 class HttpUploader : public interfaces::IDataUploader {
  private:
@@ -15,28 +15,30 @@ class HttpUploader : public interfaces::IDataUploader {
 
   Stream &console;
   interfaces::IHttp &httpCore;
+  String name;
   String uploadUrl;
   String apiKey;
-  String sensorToken;
+  String token;
   String dataToUpload;
 
  public:
-  void begin(const char *uploadUrl_, const char *apiKey_,
-             const char *sensorToken_) {
+  void begin(const char *uploadUrl_, const char *apiKey_, const char *token_) {
     this->uploadUrl = "";
     this->uploadUrl += uploadUrl_;
     this->apiKey = "";
     this->apiKey += apiKey_;
-    this->sensorToken = "";
-    this->sensorToken += sensorToken_;
+    this->token = "";
+    this->token += token_;
   }
+
+  String getName() const override { return this->name; }
 
   void clearData() override {
     this->dataToUpload = "";
     this->dataToUpload += "api_key=";
     this->dataToUpload += this->apiKey;
     this->dataToUpload += "&token=";
-    this->dataToUpload += this->sensorToken;
+    this->dataToUpload += this->token;
   };
 
   bool addData(const String name, const float value) override {
@@ -57,7 +59,7 @@ class HttpUploader : public interfaces::IDataUploader {
     bool ifDataUploaded = false;
 
     if (this->uploadUrl.length() && this->apiKey.length() &&
-        this->sensorToken.length() && this->dataToUpload.length() &&
+        this->token.length() && this->dataToUpload.length() &&
         this->httpCore.httpBegin(this->uploadUrl)) {
       this->httpCore.httpAddHeader("Content-Type",
                                    "application/x-www-form-urlencoded");
@@ -66,15 +68,15 @@ class HttpUploader : public interfaces::IDataUploader {
 #endif
 
       int postResponseCode = this->httpCore.httpSendPost(this->dataToUpload);
+
+#ifdef DEBUG
+      this->console.print(" - ");
+      this->console.println(postResponseCode);
+#endif
+
       if (postResponseCode == 200) {
         ifDataUploaded = true;
       }
-#ifdef DEBUG
-      else {
-        this->console.print(" ");
-        this->console.print(postResponseCode);
-      }
-#endif
 
       this->httpCore.httpEnd();
     }
@@ -82,8 +84,9 @@ class HttpUploader : public interfaces::IDataUploader {
     return ifDataUploaded;
   }
 
-  explicit HttpUploader(Stream &console_, interfaces::IHttp &httpCore_)
-      : console(console_), httpCore(httpCore_){};
+  explicit HttpUploader(Stream &console_, interfaces::IHttp &httpCore_,
+                        String name_)
+      : console(console_), httpCore(httpCore_), name(name_){};
 };
 
-}  // namespace wrappers
+}  // namespace uploaders

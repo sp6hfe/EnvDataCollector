@@ -2,11 +2,15 @@
 
 #include "application.h"
 #include "config.h"
+#include "httpUploader.h"
 #include "hwBme280.h"
 #include "sensorHumidity.h"
 #include "sensorPressureRaw.h"
 #include "sensorTemperature.h"
 #include "wifiCore.h"
+
+/* wifi */
+wrappers::WifiCore wifiCore(Serial, config::web_server_port);
 
 /* sensors */
 wrappers::HwBme280 bme280;
@@ -16,8 +20,8 @@ sensors::SensorHumidity sensorHumidity(bme280, "BME280 humi", "%", "humidity");
 sensors::SensorPressureRaw sensorPressureRaw(bme280, "BME280 pres", "hPa",
                                              "pressure_raw");
 
-/* wifi */
-wrappers::WifiCore wifiCore(Serial, config::web_server_port);
+/* uploaders */
+uploaders::HttpUploader httpUploader(Serial, wifiCore, "http");
 
 /* app */
 application::Application app(Serial, wifiCore);
@@ -30,10 +34,13 @@ void setup() {
 #endif
 
   Serial.begin(config::console_baudrate);
-  Serial.println();
+  httpUploader.begin(config::upload_path, config::api_key, config::token);
+
   app.registerSensor(&sensorTemperature);
   app.registerSensor(&sensorHumidity);
   app.registerSensor(&sensorPressureRaw);
+  app.registerUploader(&httpUploader);
+
   if (!app.setup()) {
     Serial.println("Application setup failed. Investigate log for failures.");
   }
