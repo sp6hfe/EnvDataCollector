@@ -1,5 +1,7 @@
 #pragma once
 
+#include <WString.h>
+
 namespace interfaces {
 
 class IDataUploader {
