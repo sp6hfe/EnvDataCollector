@@ -6,7 +6,7 @@ using namespace application;
 
 void Application::webPageRoot() {
   this->console.println("Client has accessed main page.");
-  IPAddress ip = this->wifiCore.apGetIp();
+  IPAddress ip = this->wifi.apGetIp();
   String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) +
                  '.' + String(ip[3]);
   String content = "<!DOCTYPE HTML>\r\n<html>Hello from ESP8266 at ";
@@ -18,12 +18,12 @@ void Application::webPageRoot() {
       "</label><input name='ssid' length=32><input name='pass' "
       "length=64><input type='submit'></form>";
   content += "</html>";
-  this->wifiCore.webserverSend(200, "text/html", content);
+  this->webServer.webserverSend(200, "text/html", content);
 }
 
 void Application::webPageConfig() {
-  String newSsid = this->wifiCore.webserverGetArg("ssid");
-  String newPassphrase = this->wifiCore.webserverGetArg("pass");
+  String newSsid = this->webServer.webserverGetArg("ssid");
+  String newPassphrase = this->webServer.webserverGetArg("pass");
   String content;
   int webserverStatusCode = 200;
 
@@ -39,26 +39,26 @@ void Application::webPageConfig() {
     content = "{\"Error\":\"404 not found\"}";
     webserverStatusCode = 404;
   }
-  this->wifiCore.webserverSend(webserverStatusCode, "application/json",
-                               content);
+  this->webServer.webserverSend(webserverStatusCode, "application/json",
+                                content);
 }
 
 void Application::webPageRestart() {
   String content = "{\"Success\":\"Self reset. Bye!\"}";
   this->console.println("Self reset. Bye!");
-  this->wifiCore.webserverSend(200, "application/json", content);
+  this->webServer.webserverSend(200, "application/json", content);
 
   // delay to allow web server push the data before restarting
   delay(1500);
-  this->wifiCore.restart();
+  this->system.restart();
 }
 
 void Application::webserverConfig() {
-  this->wifiCore.webserverRegisterPage(
+  this->webServer.webserverRegisterPage(
       "/", [this]() -> void { this->webPageRoot(); });
-  this->wifiCore.webserverRegisterPage(
+  this->webServer.webserverRegisterPage(
       "/config", [this]() -> void { this->webPageConfig(); });
-  this->wifiCore.webserverRegisterPage(
+  this->webServer.webserverRegisterPage(
       "/restart", [this]() -> void { this->webPageRestart(); });
 }
 
@@ -67,19 +67,19 @@ bool Application::uploadLinkReady(const char *wifiSsid,
                                   const uint8_t timeoutSec) {
   bool ifLinkActive = true;
 
-  if (!this->wifiCore.wifiConnected()) {
+  if (!this->wifi.wifiConnected()) {
     this->console.print("Connecting to WiFi AP: \"");
     this->console.print(wifiSsid);
     this->console.print("\"");
-    this->wifiCore.wifiBegin();
+    this->wifi.wifiBegin();
 
-    if (!this->wifiCore.wifiConnect(wifiSsid, wifiPassphrase, timeoutSec)) {
+    if (!this->wifi.wifiConnect(wifiSsid, wifiPassphrase, timeoutSec)) {
       this->console.println();
       ifLinkActive = false;
     } else {
       this->console.println();
       this->console.print("Connected with IP: ");
-      this->console.print(this->wifiCore.wifiGetIp());
+      this->console.print(this->wifi.wifiGetIp());
       this->console.println(".");
     }
   }
@@ -198,7 +198,7 @@ bool Application::setup() {
   bool ifSetupOk = true;
 
   // reset wifi state
-  this->wifiCore.wifiBegin();
+  this->wifi.wifiBegin();
 
   // welcome message
   this->console.println();
@@ -230,13 +230,13 @@ bool Application::setup() {
     this->console.println();
     this->console.println("WiFi connection timeout - starting AP.");
     // TODO: get rid of magic numbers
-    if (this->wifiCore.apBegin(config::ap_ssid, config::ap_pass, 5, 0, 2)) {
+    if (this->wifi.apBegin(config::ap_ssid, config::ap_pass, 5, 0, 2)) {
       this->console.println("");
       this->console.print("AP IP: ");
-      this->console.println(this->wifiCore.apGetIp());
+      this->console.println(this->wifi.apGetIp());
       this->console.println("Starting web server.");
       this->webserverConfig();
-      this->wifiCore.webserverBegin();
+      this->webServer.webserverBegin();
       this->console.println("Done.");
       this->opMode = OpMode::CONFIG;
     } else {
@@ -279,13 +279,13 @@ void Application::loop(unsigned long loopEnterMillis) {
       }
       break;
     case OpMode::CONFIG:
-      this->wifiCore.webserverPerform();
+      this->webServer.webserverPerform();
       break;
     default:
       /* fall though */
     case OpMode::RESTART:
       this->console.println("Restarting...");
-      this->wifiCore.restart();
+      this->system.restart();
       break;
   }
 }

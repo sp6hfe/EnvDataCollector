@@ -2,15 +2,15 @@
 
 #include "application.h"
 #include "config.h"
+#include "esp8266Core.h"
 #include "httpUploader.h"
 #include "hwBme280.h"
 #include "sensorHumidity.h"
 #include "sensorPressureRaw.h"
 #include "sensorTemperature.h"
-#include "wifiCore.h"
 
-/* wifi */
-wrappers::WifiCore wifiCore(Serial, config::web_server_port);
+/* core */
+wrappers::ESP8266Core esp8266Core(Serial, config::web_server_port);
 
 /* sensors */
 wrappers::HwBme280 bme280;
@@ -21,10 +21,11 @@ sensors::SensorPressureRaw sensorPressureRaw(bme280, "BME280 pres", "hPa",
                                              "pressure_raw");
 
 /* uploaders */
-uploaders::HttpUploader httpUploader(Serial, wifiCore, "http");
+uploaders::HttpUploader httpUploader(Serial, esp8266Core, "http");
 
 /* app */
-application::Application app(Serial, wifiCore);
+application::Application app(Serial, esp8266Core, esp8266Core, esp8266Core,
+                             esp8266Core);
 
 void setup() {
 #ifdef DEBUG

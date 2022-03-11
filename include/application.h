@@ -1,12 +1,14 @@
 #pragma once
 
 #include <Stream.h>
-
 #include <vector>
 
 #include "IDataUploader.h"
+#include "IHttp.h"
 #include "ISensor.h"
-#include "wifiCore.h"
+#include "ISystem.h"
+#include "IWebServer.h"
+#include "IWiFi.h"
 
 namespace application {
 
@@ -20,7 +22,10 @@ class Application {
 
   OpMode opMode = OpMode::RESTART;
   Stream &console;
-  wrappers::WifiCore &wifiCore;
+  interfaces::ISystem &system;
+  interfaces::IWiFi &wifi;
+  interfaces::IWebServer &webServer;
+  interfaces::IHttp &http;
   std::vector<interfaces::ISensor *> sensorSet;
   std::vector<interfaces::IDataUploader *> uploaderSet;
 
@@ -38,8 +43,15 @@ class Application {
   bool setup();
   void loop(unsigned long loopEnterMillis);
 
-  explicit Application(Stream &console_, wrappers::WifiCore &wifiCore_)
-      : console(console_), wifiCore(wifiCore_) {}
+  explicit Application(Stream &console_, interfaces::ISystem &system_,
+                       interfaces::IWiFi &wifi_,
+                       interfaces::IWebServer &webServer_,
+                       interfaces::IHttp &http_)
+      : console(console_),
+        system(system_),
+        wifi(wifi_),
+        webServer(webServer_),
+        http(http_) {}
 };
 
 }  // namespace application

@@ -12,10 +12,10 @@
 
 namespace wrappers {
 
-class WifiCore : public interfaces::ISystem,
-                 public interfaces::IWiFi,
-                 public interfaces::IWebServer,
-                 public interfaces::IHttp {
+class ESP8266Core : public interfaces::ISystem,
+                    public interfaces::IWiFi,
+                    public interfaces::IWebServer,
+                    public interfaces::IHttp {
  private:
   Stream &console;
   WiFiClient wifi_client;
@@ -99,7 +99,7 @@ class WifiCore : public interfaces::ISystem,
 
   void httpEnd() override { this->http_client.end(); }
 
-  explicit WifiCore(Stream &console_, uint16_t web_server_port_)
+  explicit ESP8266Core(Stream &console_, uint16_t web_server_port_)
       : console(console_), web_server(web_server_port_){};
 };
 
