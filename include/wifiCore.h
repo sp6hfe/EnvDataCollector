@@ -6,12 +6,14 @@
 #include <Stream.h>
 
 #include "IHttp.h"
+#include "ISystem.h"
 #include "IWebServer.h"
 #include "IWiFi.h"
 
 namespace wrappers {
 
-class WifiCore : public interfaces::IWiFi,
+class WifiCore : public interfaces::ISystem,
+                 public interfaces::IWiFi,
                  public interfaces::IWebServer,
                  public interfaces::IHttp {
  private:
@@ -21,7 +23,9 @@ class WifiCore : public interfaces::IWiFi,
   ESP8266WebServer web_server;
 
  public:
-  void restart() { ESP.restart(); }
+  /* System */
+
+  void restart() override { ESP.restart(); }
 
   /* WiFi */
 
