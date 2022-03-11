@@ -7,10 +7,13 @@
 
 #include "IHttp.h"
 #include "IWebServer.h"
+#include "IWiFi.h"
 
 namespace wrappers {
 
-class WifiCore : public interfaces::IWebServer, public interfaces::IHttp {
+class WifiCore : public interfaces::IWiFi,
+                 public interfaces::IWebServer,
+                 public interfaces::IHttp {
  private:
   Stream &console;
   WiFiClient wifi_client;
@@ -20,7 +23,9 @@ class WifiCore : public interfaces::IWebServer, public interfaces::IHttp {
  public:
   void restart() { ESP.restart(); }
 
-  void wifiBegin() {
+  /* WiFi */
+
+  void wifiBegin() override {
     // cleaning after previous configuration that may be still active
     WiFi.disconnect();
     WiFi.mode(WIFI_OFF);
@@ -28,7 +33,7 @@ class WifiCore : public interfaces::IWebServer, public interfaces::IHttp {
   }
 
   bool wifiConnect(const char *wifi_ssid, const char *wifi_passphrase,
-                   const uint8_t timeout_sec) {
+                   const uint8_t timeout_sec) override {
     WiFi.mode(WIFI_AP_STA);
     WiFi.begin(wifi_ssid, wifi_passphrase);
 
@@ -42,18 +47,19 @@ class WifiCore : public interfaces::IWebServer, public interfaces::IHttp {
     return (WiFi.status() == WL_CONNECTED);
   }
 
-  bool wifiConnected() { return WiFi.isConnected(); }
+  bool wifiConnected() override { return WiFi.isConnected(); }
 
-  IPAddress wifiGetIp() { return WiFi.localIP(); }
+  IPAddress wifiGetIp() override { return WiFi.localIP(); }
 
   bool apBegin(const char *ssid, const char *psk, int channel, int ssid_hidden,
-               int max_connection) {
+               int max_connection) override {
     return WiFi.softAP(ssid, psk, channel, ssid_hidden, max_connection);
   }
 
-  IPAddress apGetIp() { return WiFi.softAPIP(); }
+  IPAddress apGetIp() override { return WiFi.softAPIP(); }
 
   /* Web Server */
+
   void webserverBegin() override { this->web_server.begin(); }
 
   void webserverRegisterPage(const char *uri,
@@ -73,6 +79,7 @@ class WifiCore : public interfaces::IWebServer, public interfaces::IHttp {
   void webserverPerform() override { this->web_server.handleClient(); }
 
   /* HTTP client */
+
   bool httpBegin(const String &url) override {
     return this->http_client.begin(this->wifi_client, url);
   }
