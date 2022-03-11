@@ -6,10 +6,11 @@
 #include <Stream.h>
 
 #include "IHttp.h"
+#include "IWebServer.h"
 
 namespace wrappers {
 
-class WifiCore : public interfaces::IHttp {
+class WifiCore : public interfaces::IWebServer, public interfaces::IHttp {
  private:
   Stream &console;
   WiFiClient wifi_client;
@@ -52,24 +53,26 @@ class WifiCore : public interfaces::IHttp {
 
   IPAddress apGetIp() { return WiFi.softAPIP(); }
 
-  void webserverBegin() { this->web_server.begin(); }
+  /* Web Server */
+  void webserverBegin() override { this->web_server.begin(); }
 
   void webserverRegisterPage(const char *uri,
-                             std::function<void(void)> callback) {
+                             std::function<void(void)> callback) override {
     this->web_server.on(uri, callback);
   }
 
-  const String &webserverGetArg(const String &name) {
+  const String &webserverGetArg(const String &name) override {
     return this->web_server.arg(name);
   }
 
   void webserverSend(int code, const char *content_type,
-                     const String &content) {
+                     const String &content) override {
     this->web_server.send(code, content_type, content);
   }
 
-  void webserverPerform() { this->web_server.handleClient(); }
+  void webserverPerform() override { this->web_server.handleClient(); }
 
+  /* HTTP client */
   bool httpBegin(const String &url) override {
     return this->http_client.begin(this->wifi_client, url);
   }
