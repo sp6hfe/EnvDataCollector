@@ -16,15 +16,15 @@ class SensorPressureRaw : public sensors::SensorBase {
     return this->bme280.measure(timestamp);
   }
 
-  bool newValue() const final { return this->bme280.isNewPressureRaw(); }
+  bool newData() const final { return this->bme280.isNewPressureRaw(); }
 
-  float getValue() final { return this->bme280.getPressureRaw(); }
+  float getData() final { return this->bme280.getPressureRaw(); }
 
   explicit SensorPressureRaw(wrappers::HwBme280 &bme280_, String name_,
-                             String unit_)
-      : sensors::SensorBase(name_, unit_), bme280(bme280_){};
+                             String unit_, String dataId_)
+      : sensors::SensorBase(name_, unit_, dataId_), bme280(bme280_) {}
 
-  virtual ~SensorPressureRaw(){};
+  virtual ~SensorPressureRaw() {}
 };
 
 }  // namespace sensors

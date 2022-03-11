@@ -16,15 +16,15 @@ class SensorHumidity : public sensors::SensorBase {
     return this->bme280.measure(timestamp);
   }
 
-  bool newValue() const final { return this->bme280.isNewHumidity(); }
+  bool newData() const final { return this->bme280.isNewHumidity(); }
 
-  float getValue() final { return this->bme280.getHumidity(); }
+  float getData() final { return this->bme280.getHumidity(); }
 
   explicit SensorHumidity(wrappers::HwBme280 &bme280_, String name_,
-                          String unit_)
-      : sensors::SensorBase(name_, unit_), bme280(bme280_){};
+                          String unit_, String dataId_)
+      : sensors::SensorBase(name_, unit_, dataId_), bme280(bme280_) {}
 
-  virtual ~SensorHumidity(){};
+  virtual ~SensorHumidity() {}
 };
 
 }  // namespace sensors

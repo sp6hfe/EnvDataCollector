@@ -16,15 +16,15 @@ class SensorTemperature : public sensors::SensorBase {
     return this->bme280.measure(timestamp);
   }
 
-  bool newValue() const override { return this->bme280.isNewTemperature(); }
+  bool newData() const override { return this->bme280.isNewTemperature(); }
 
-  float getValue() override { return this->bme280.getTemperature(); }
+  float getData() override { return this->bme280.getTemperature(); }
 
   explicit SensorTemperature(wrappers::HwBme280 &bme280_, String name_,
-                             String unit_)
-      : sensors::SensorBase(name_, unit_), bme280(bme280_){};
+                             String unit_, String dataId_)
+      : sensors::SensorBase(name_, unit_, dataId_), bme280(bme280_) {}
 
-  virtual ~SensorTemperature(){};
+  virtual ~SensorTemperature() {}
 };
 
 }  // namespace sensors

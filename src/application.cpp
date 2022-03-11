@@ -92,42 +92,45 @@ bool Application::logAndUpload(bool uploadAllowed) {
   bool logAndUploadResult = false;
 
   this->dataUploader.clearData();
-  this->console.print("Measurements:");
+  this->console.println();
+  this->console.print("New measurements:");
 
   for (auto sensor : this->sensorSet) {
-    if (sensor->newValue()) {
+    if (sensor->newData()) {
       // assumption here is that we want to upload only new measurements and
       // newValue() returns false after first readout with getValue()
       if (uploadAllowed) {
-        this->dataUploader.addData(sensor->getName(), sensor->getValue());
+        this->dataUploader.addData(sensor->getDataId(), sensor->getData());
       }
 
-      this->console.print(" ");
-      this->console.print(sensor->getValue());
+      this->console.println();
+      this->console.print(sensor->getName());
+      this->console.print(": ");
+      this->console.print(sensor->getData());
       this->console.print("[");
       this->console.print(sensor->getUnit());
       this->console.print("]");
       anyNewMeasurement = true;
     }
   }
-  this->console.print(" ");
 
   if (!anyNewMeasurement) {
     // nothing to log/upload
-    this->console.print("no new measurements - check log for errors");
+    this->console.println(" no new measurements - check log for errors.");
   } else if (uploadAllowed) {
     // new logged measurements queued for upload
+    this->console.println();
     if (this->dataUploader.upload()) {
-      this->console.print(" (+)");
+      this->console.println();
+      this->console.println("(+) Data uploaded.");
       logAndUploadResult = true;
     } else {
-      this->console.print(" (-)");
+      this->console.println("(-) Error uploading data.");
     }
   } else {
     // new measurements logged
     logAndUploadResult = true;
   }
-  this->console.println(".");
 
   return logAndUploadResult;
 }

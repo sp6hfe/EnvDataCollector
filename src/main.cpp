@@ -1,4 +1,5 @@
 #include <Arduino.h>
+
 #include "application.h"
 #include "config.h"
 #include "hwBme280.h"
@@ -9,9 +10,11 @@
 
 /* sensors */
 wrappers::HwBme280 bme280;
-sensors::SensorTemperature sensorTemperature(bme280, "temperature", "*C");
-sensors::SensorHumidity sensorHumidity(bme280, "humidity", "%");
-sensors::SensorPressureRaw sensorPressureRaw(bme280, "pressure_raw", "hPa");
+sensors::SensorTemperature sensorTemperature(bme280, "BME280 temp", "*C",
+                                             "temperature");
+sensors::SensorHumidity sensorHumidity(bme280, "BME280 humi", "%", "humidity");
+sensors::SensorPressureRaw sensorPressureRaw(bme280, "BME280 pres", "hPa",
+                                             "pressure_raw");
 
 /* wifi */
 wrappers::WifiCore wifiCore(Serial, config::web_server_port);
