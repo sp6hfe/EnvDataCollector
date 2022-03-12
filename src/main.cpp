@@ -40,6 +40,7 @@ void setup() {
   app.setInterMeasurementsDelay(config::inter_measurements_delay_sec);
   app.setWifiConnectionParams(config::ssid, config::pass,
                               config::inter_measurements_delay_sec);
+  app.setApConnectionParams(config::ap_ssid, config::ap_pass);
   app.registerSensor(&sensorTemperature);
   app.registerSensor(&sensorHumidity);
   app.registerSensor(&sensorPressureRaw);

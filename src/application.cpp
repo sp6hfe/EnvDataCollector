@@ -1,7 +1,5 @@
 #include "application.h"
 
-#include "config.h"
-
 using namespace application;
 
 void Application::webPageRoot() {
@@ -204,6 +202,11 @@ void Application::setWifiConnectionParams(const char *ssid, const char *pass,
   this->wifiConnectionTimeoutSec = timeoutSec;
 }
 
+void Application::setApConnectionParams(const char *ssid, const char *pass) {
+  this->apSsid = ssid;
+  this->apPass = pass;
+}
+
 bool Application::setup() {
   bool ifSetupOk = true;
 
@@ -239,7 +242,8 @@ bool Application::setup() {
     this->console.println();
     this->console.println("WiFi connection timeout - starting AP.");
     // TODO: get rid of magic numbers
-    if (this->wifi.apBegin(config::ap_ssid, config::ap_pass, 5, 0, 2)) {
+    if (this->wifi.apBegin(this->apSsid.c_str(), this->apPass.c_str(), 5, 0,
+                           2)) {
       this->console.println("");
       this->console.print("AP IP: ");
       this->console.println(this->wifi.apGetIp());

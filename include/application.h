@@ -32,9 +32,13 @@ class Application {
 
   OpMode opMode = OpMode::RESTART;
   uint8_t interMeasurementsDelaySec = 60;
+
   String wifiSsid = "notConfigured";
   String wifiPass = "noPass";
   uint8_t wifiConnectionTimeoutSec = 10;
+
+  String apSsid = "EnvDataCollector";
+  String apPass = "noPass";
 
   void webPageRoot();
   void webPageConfig();
@@ -49,6 +53,7 @@ class Application {
   void setInterMeasurementsDelay(uint8_t seconds);
   void setWifiConnectionParams(const char *ssid, const char *pass,
                                uint8_t timeoutSec);
+  void setApConnectionParams(const char *ssid, const char *pass);
   bool setup();
   void loop(unsigned long loopEnterMillis);
 
