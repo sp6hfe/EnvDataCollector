@@ -37,6 +37,9 @@ void setup() {
   Serial.begin(config::console_baudrate);
   httpUploader.begin(config::upload_path, config::api_key, config::token);
 
+  app.setInterMeasurementsDelay(config::inter_measurements_delay_sec);
+  app.setWifiConnectionParams(config::ssid, config::pass,
+                              config::inter_measurements_delay_sec);
   app.registerSensor(&sensorTemperature);
   app.registerSensor(&sensorHumidity);
   app.registerSensor(&sensorPressureRaw);

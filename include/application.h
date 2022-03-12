@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Stream.h>
+#include <WString.h>
+#include <cstdint>
 #include <vector>
 
 #include "IDataUploader.h"
@@ -20,7 +22,6 @@ class Application {
     CONFIG,
   };
 
-  OpMode opMode = OpMode::RESTART;
   Stream &console;
   interfaces::ISystem &system;
   interfaces::IWiFi &wifi;
@@ -29,17 +30,25 @@ class Application {
   std::vector<interfaces::ISensor *> sensorSet;
   std::vector<interfaces::IDataUploader *> uploaderSet;
 
+  OpMode opMode = OpMode::RESTART;
+  uint8_t interMeasurementsDelaySec = 60;
+  String wifiSsid = "notConfigured";
+  String wifiPass = "noPass";
+  uint8_t wifiConnectionTimeoutSec = 10;
+
   void webPageRoot();
   void webPageConfig();
   void webPageRestart();
   void webserverConfig();
-  bool uploadLinkReady(const char *wifiSsid, const char *wifiPassphrase,
-                       const uint8_t timeoutSec);
+  bool uploadLinkReady();
   bool logAndUpload(bool logOnly);
 
  public:
   bool registerSensor(interfaces::ISensor *newSensor);
   bool registerUploader(interfaces::IDataUploader *newUploader);
+  void setInterMeasurementsDelay(uint8_t seconds);
+  void setWifiConnectionParams(const char *ssid, const char *pass,
+                               uint8_t timeoutSec);
   bool setup();
   void loop(unsigned long loopEnterMillis);
 

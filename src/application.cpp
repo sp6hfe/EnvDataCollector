@@ -62,18 +62,17 @@ void Application::webserverConfig() {
       "/restart", [this]() -> void { this->webPageRestart(); });
 }
 
-bool Application::uploadLinkReady(const char *wifiSsid,
-                                  const char *wifiPassphrase,
-                                  const uint8_t timeoutSec) {
+bool Application::uploadLinkReady() {
   bool ifLinkActive = true;
 
   if (!this->wifi.wifiConnected()) {
     this->console.print("Connecting to WiFi AP: \"");
-    this->console.print(wifiSsid);
+    this->console.print(this->wifiSsid);
     this->console.print("\"");
     this->wifi.wifiBegin();
 
-    if (!this->wifi.wifiConnect(wifiSsid, wifiPassphrase, timeoutSec)) {
+    if (!this->wifi.wifiConnect(this->wifiSsid.c_str(), this->wifiPass.c_str(),
+                                this->wifiConnectionTimeoutSec)) {
       this->console.println();
       ifLinkActive = false;
     } else {
@@ -194,6 +193,17 @@ bool Application::registerUploader(interfaces::IDataUploader *newUploader) {
   return ifUploaderRegistered;
 }
 
+void Application::setInterMeasurementsDelay(uint8_t seconds) {
+  this->interMeasurementsDelaySec = seconds;
+}
+
+void Application::setWifiConnectionParams(const char *ssid, const char *pass,
+                                          uint8_t timeoutSec) {
+  this->wifiSsid = ssid;
+  this->wifiPass = pass;
+  this->wifiConnectionTimeoutSec = timeoutSec;
+}
+
 bool Application::setup() {
   bool ifSetupOk = true;
 
@@ -221,8 +231,7 @@ bool Application::setup() {
   }
 
   // connect to wifi by default
-  if (this->uploadLinkReady(config::ssid, config::pass,
-                            config::wifi_connect_timeout_sec)) {
+  if (this->uploadLinkReady()) {
     this->console.println("Starting measurements.");
     this->opMode = OpMode::MEASUREMENTS;
   } else {
@@ -255,8 +264,7 @@ void Application::loop(unsigned long loopEnterMillis) {
     case OpMode::MEASUREMENTS:
       // deal with WiFi first not to delay upload after measurements
       {
-        bool linkReady = this->uploadLinkReady(
-            config::ssid, config::pass, config::wifi_connect_timeout_sec);
+        bool linkReady = this->uploadLinkReady();
 
         // collect measurements
         for (auto sensor : this->sensorSet) {
@@ -275,7 +283,7 @@ void Application::loop(unsigned long loopEnterMillis) {
           this->console.println("Error on data logging/uploading.");
         }
 
-        delay(config::inter_measurements_delay_sec * 1000);
+        delay(this->interMeasurementsDelaySec * 1000);
       }
       break;
     case OpMode::CONFIG:
