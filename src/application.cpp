@@ -2,64 +2,6 @@
 
 using namespace application;
 
-void Application::webPageRoot() {
-  this->console.println("Client has accessed main page.");
-  IPAddress ip = this->wifi.apGetIp();
-  String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) +
-                 '.' + String(ip[3]);
-  String content = "<!DOCTYPE HTML>\r\n<html>Hello from ESP8266 at ";
-  content += ipStr;
-  content += "<p>";
-  //   this->webContent += st;
-  content +=
-      "</p><form method='get' action='config'><label>SSID: "
-      "</label><input name='ssid' length=32><input name='pass' "
-      "length=64><input type='submit'></form>";
-  content += "</html>";
-  this->webServer.webserverSend(200, "text/html", content);
-}
-
-void Application::webPageConfig() {
-  String newSsid = this->webServer.webserverGetArg("ssid");
-  String newPassphrase = this->webServer.webserverGetArg("pass");
-  String content;
-  int webserverStatusCode = 200;
-
-  if (newSsid.length() > 0 && newPassphrase.length() > 0) {
-    this->console.println("Received data:");
-    this->console.print("ssid: ");
-    this->console.println(newSsid);
-    this->console.print("pass: ");
-    this->console.println(newPassphrase);
-    content = "{\"Success\":\"Data received.\"}";
-  } else {
-    this->console.println("Received data not usable. Sending 404.");
-    content = "{\"Error\":\"404 not found\"}";
-    webserverStatusCode = 404;
-  }
-  this->webServer.webserverSend(webserverStatusCode, "application/json",
-                                content);
-}
-
-void Application::webPageRestart() {
-  String content = "{\"Success\":\"Self reset. Bye!\"}";
-  this->console.println("Self reset. Bye!");
-  this->webServer.webserverSend(200, "application/json", content);
-
-  // delay to allow web server push the data before restarting
-  delay(1500);
-  this->system.restart();
-}
-
-void Application::webserverConfig() {
-  this->webServer.webserverRegisterPage(
-      "/", [this]() -> void { this->webPageRoot(); });
-  this->webServer.webserverRegisterPage(
-      "/config", [this]() -> void { this->webPageConfig(); });
-  this->webServer.webserverRegisterPage(
-      "/restart", [this]() -> void { this->webPageRestart(); });
-}
-
 bool Application::uploadLinkReady() {
   bool ifLinkActive = true;
 
@@ -191,6 +133,18 @@ bool Application::registerUploader(interfaces::IDataUploader *newUploader) {
   return ifUploaderRegistered;
 }
 
+bool Application::registerConfigurator(
+    interfaces::IConfigurator *newConfigurator) {
+  bool ifConfiguratorRegistered = false;
+
+  if (newConfigurator) {
+    this->configurator = newConfigurator;
+    ifConfiguratorRegistered = true;
+  }
+
+  return ifConfiguratorRegistered;
+}
+
 void Application::setInterMeasurementsDelay(uint8_t seconds) {
   this->interMeasurementsDelaySec = seconds;
 }
@@ -202,11 +156,6 @@ void Application::setWifiConnectionParams(const char *ssid, const char *pass,
   this->wifiConnectionTimeoutSec = timeoutSec;
 }
 
-void Application::setApConnectionParams(const char *ssid, const char *pass) {
-  this->apSsid = ssid;
-  this->apPass = pass;
-}
-
 bool Application::setup() {
   bool ifSetupOk = true;
 
@@ -215,9 +164,10 @@ bool Application::setup() {
 
   // welcome message
   this->console.println();
-  this->console.println("**********");
-  this->console.println("Environmental Data Collector by SP6HFE");
-  this->console.println("**********");
+  this->console.println("+------------------------------+");
+  this->console.println("| Environmental Data Collector |");
+  this->console.println("|           by SP6HFE          |");
+  this->console.println("+------------------------------+");
   this->console.println();
 
   // init all sensors
@@ -233,28 +183,19 @@ bool Application::setup() {
     }
   }
 
-  // connect to wifi by default
+  // setup upload connection
   if (this->uploadLinkReady()) {
     this->console.println("Starting measurements.");
     this->opMode = OpMode::MEASUREMENTS;
   } else {
-    // setup AP for configuration in case of connection error
+    // setup configurator in case of upload connection failure
     this->console.println();
-    this->console.println("WiFi connection timeout - starting AP.");
-    // TODO: get rid of magic numbers
-    if (this->wifi.apBegin(this->apSsid.c_str(), this->apPass.c_str(), 5, 0,
-                           2)) {
-      this->console.println("");
-      this->console.print("AP IP: ");
-      this->console.println(this->wifi.apGetIp());
-      this->console.println("Starting web server.");
-      this->webserverConfig();
-      this->webServer.webserverBegin();
-      this->console.println("Done.");
+    this->console.println("Data link error - setting up configurator...");
+
+    if (this->configurator->start()) {
       this->opMode = OpMode::CONFIG;
     } else {
-      this->console.println(
-          "AP setup failed. There is no way to communicate wirelessly.");
+      this->console.println("There is no way to configure the device.");
       this->opMode = OpMode::RESTART;
       ifSetupOk = false;
     }
@@ -291,7 +232,16 @@ void Application::loop(unsigned long loopEnterMillis) {
       }
       break;
     case OpMode::CONFIG:
-      this->webServer.webserverPerform();
+      // handle configurator exit code
+      {
+        int configuratorExitCode = this->configurator->perform();
+
+        if (configuratorExitCode < 0) {
+          this->opMode = OpMode::RESTART;
+        } else if (configuratorExitCode == 0) {
+          this->opMode = OpMode::MEASUREMENTS;
+        }
+      }
       break;
     default:
       /* fall though */
