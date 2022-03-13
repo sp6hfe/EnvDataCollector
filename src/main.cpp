@@ -24,8 +24,7 @@ sensors::SensorPressureRaw sensorPressureRaw(bme280, "BME280 pres", "hPa",
 uploaders::HttpUploader httpUploader(Serial, esp8266Core, "http");
 
 /* app */
-application::Application app(Serial, esp8266Core, esp8266Core, esp8266Core,
-                             esp8266Core);
+application::Application app(Serial, esp8266Core, esp8266Core, esp8266Core);
 
 void setup() {
 #ifdef DEBUG

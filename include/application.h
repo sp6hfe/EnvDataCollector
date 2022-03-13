@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "IDataUploader.h"
-#include "IHttp.h"
 #include "ISensor.h"
 #include "ISystem.h"
 #include "IWebServer.h"
@@ -26,7 +25,6 @@ class Application {
   interfaces::ISystem &system;
   interfaces::IWiFi &wifi;
   interfaces::IWebServer &webServer;
-  interfaces::IHttp &http;
   std::vector<interfaces::ISensor *> sensorSet;
   std::vector<interfaces::IDataUploader *> uploaderSet;
 
@@ -59,13 +57,11 @@ class Application {
 
   explicit Application(Stream &console_, interfaces::ISystem &system_,
                        interfaces::IWiFi &wifi_,
-                       interfaces::IWebServer &webServer_,
-                       interfaces::IHttp &http_)
+                       interfaces::IWebServer &webServer_)
       : console(console_),
         system(system_),
         wifi(wifi_),
-        webServer(webServer_),
-        http(http_) {}
+        webServer(webServer_) {}
 };
 
 }  // namespace application
