@@ -1,9 +1,11 @@
 #pragma once
 
 #include <Stream.h>
+#include <cstdint>
 
 #include "IDataUploader.h"
 #include "IHttp.h"
+#include "IWiFi.h"
 #include "helpers.h"
 
 namespace uploaders {
@@ -14,6 +16,7 @@ class HttpUploader : public interfaces::IDataUploader {
                                         // '\0'
 
   Stream &console;
+  interfaces::IWiFi &wifiCore;
   interfaces::IHttp &httpCore;
   String name;
   String uploadUrl;
@@ -21,14 +24,27 @@ class HttpUploader : public interfaces::IDataUploader {
   String token;
   String dataToUpload;
 
+  String wifiSsid = "notConfigured";
+  String wifiPass = "noPass";
+  uint8_t wifiConnectionTimeoutSec = 10;
+
  public:
-  void begin(const char *uploadUrl_, const char *apiKey_, const char *token_) {
-    this->uploadUrl = "";
-    this->uploadUrl += uploadUrl_;
-    this->apiKey = "";
-    this->apiKey += apiKey_;
-    this->token = "";
-    this->token += token_;
+  void begin(const char *wifiSsid_, const char *wifiPass_,
+             const uint8_t wifiConnectionTimeoutSec_, const char *uploadUrl_,
+             const char *apiKey_, const char *token_) {
+    // reset wifi state
+    this->wifiCore.wifiBegin();
+
+    // apply congiguration
+    if (wifiSsid_ && wifiPass_ && (wifiConnectionTimeoutSec_ > 0) &&
+        uploadUrl_ && apiKey_ && token_) {
+      this->wifiSsid = wifiSsid_;
+      this->wifiPass = wifiPass_;
+      this->wifiConnectionTimeoutSec = wifiConnectionTimeoutSec_;
+      this->uploadUrl = uploadUrl_;
+      this->apiKey = apiKey_;
+      this->token = token_;
+    }
   }
 
   String getName() const override { return this->name; }
@@ -55,12 +71,37 @@ class HttpUploader : public interfaces::IDataUploader {
     return ifDataAdded;
   }
 
+  bool uploadLinkSetup() override {
+    bool ifLinkSetup = true;
+
+    if (!this->wifiCore.wifiConnected()) {
+      this->console.print("Connecting to WiFi AP: \"");
+      this->console.print(this->wifiSsid);
+      this->console.print("\"");
+      this->wifiCore.wifiBegin();
+
+      if (!this->wifiCore.wifiConnect(this->wifiSsid.c_str(),
+                                      this->wifiPass.c_str(),
+                                      this->wifiConnectionTimeoutSec)) {
+        this->console.println();
+        ifLinkSetup = false;
+      } else {
+        this->console.println();
+        this->console.print("Connected with IP: ");
+        this->console.print(this->wifiCore.wifiGetIp());
+        this->console.println(".");
+      }
+    }
+
+    return ifLinkSetup;
+  }
+
   bool upload() override {
     bool ifDataUploaded = false;
 
     if (this->uploadUrl.length() && this->apiKey.length() &&
         this->token.length() && this->dataToUpload.length() &&
-        this->httpCore.httpBegin(this->uploadUrl)) {
+        this->uploadLinkSetup() && this->httpCore.httpBegin(this->uploadUrl)) {
       this->httpCore.httpAddHeader("Content-Type",
                                    "application/x-www-form-urlencoded");
 #ifdef DEBUG
@@ -84,9 +125,12 @@ class HttpUploader : public interfaces::IDataUploader {
     return ifDataUploaded;
   }
 
-  explicit HttpUploader(Stream &console_, interfaces::IHttp &httpCore_,
-                        String name_)
-      : console(console_), httpCore(httpCore_), name(name_){};
+  explicit HttpUploader(Stream &console_, interfaces::IWiFi &wifiCore_,
+                        interfaces::IHttp &httpCore_, String name_)
+      : console(console_),
+        wifiCore(wifiCore_),
+        httpCore(httpCore_),
+        name(name_){};
 };
 
 }  // namespace uploaders

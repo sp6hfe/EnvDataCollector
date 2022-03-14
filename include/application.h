@@ -23,7 +23,6 @@ class Application {
 
   Stream &console;
   interfaces::ISystem &system;
-  interfaces::IWiFi &wifi;
   std::vector<interfaces::ISensor *> sensorSet;
   std::vector<interfaces::IDataUploader *> uploaderSet;
   interfaces::IConfigurator *configurator;
@@ -31,11 +30,6 @@ class Application {
   OpMode opMode = OpMode::RESTART;
   uint8_t interMeasurementsDelaySec = 60;
 
-  String wifiSsid = "notConfigured";
-  String wifiPass = "noPass";
-  uint8_t wifiConnectionTimeoutSec = 10;
-
-  bool uploadLinkReady();
   bool logAndUpload(bool logOnly);
 
  public:
@@ -43,14 +37,11 @@ class Application {
   bool registerUploader(interfaces::IDataUploader *newUploader);
   bool registerConfigurator(interfaces::IConfigurator *newConfigurator);
   void setInterMeasurementsDelay(uint8_t seconds);
-  void setWifiConnectionParams(const char *ssid, const char *pass,
-                               uint8_t timeoutSec);
   bool setup();
   void loop(unsigned long loopEnterMillis);
 
-  explicit Application(Stream &console_, interfaces::ISystem &system_,
-                       interfaces::IWiFi &wifi_)
-      : console(console_), system(system_), wifi(wifi_) {}
+  explicit Application(Stream &console_, interfaces::ISystem &system_)
+      : console(console_), system(system_) {}
 };
 
 }  // namespace application

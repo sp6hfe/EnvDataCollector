@@ -2,30 +2,6 @@
 
 using namespace application;
 
-bool Application::uploadLinkReady() {
-  bool ifLinkActive = true;
-
-  if (!this->wifi.wifiConnected()) {
-    this->console.print("Connecting to WiFi AP: \"");
-    this->console.print(this->wifiSsid);
-    this->console.print("\"");
-    this->wifi.wifiBegin();
-
-    if (!this->wifi.wifiConnect(this->wifiSsid.c_str(), this->wifiPass.c_str(),
-                                this->wifiConnectionTimeoutSec)) {
-      this->console.println();
-      ifLinkActive = false;
-    } else {
-      this->console.println();
-      this->console.print("Connected with IP: ");
-      this->console.print(this->wifi.wifiGetIp());
-      this->console.println(".");
-    }
-  }
-
-  return ifLinkActive;
-}
-
 bool Application::logAndUpload(bool uploadAllowed) {
   bool anyNewMeasurement = false;
   bool logAndUploadResult = false;
@@ -149,18 +125,8 @@ void Application::setInterMeasurementsDelay(uint8_t seconds) {
   this->interMeasurementsDelaySec = seconds;
 }
 
-void Application::setWifiConnectionParams(const char *ssid, const char *pass,
-                                          uint8_t timeoutSec) {
-  this->wifiSsid = ssid;
-  this->wifiPass = pass;
-  this->wifiConnectionTimeoutSec = timeoutSec;
-}
-
 bool Application::setup() {
   bool ifSetupOk = true;
-
-  // reset wifi state
-  this->wifi.wifiBegin();
 
   // welcome message
   this->console.println();
@@ -183,19 +149,28 @@ bool Application::setup() {
     }
   }
 
-  // setup upload connection
-  if (this->uploadLinkReady()) {
+  // try to setup upload connections
+  bool anyUploaderConnectionWorked = false;
+  for (auto uploader : this->uploaderSet) {
+    if (uploader->uploadLinkSetup()) {
+      anyUploaderConnectionWorked = true;
+    }
+  }
+
+  if (anyUploaderConnectionWorked) {
     this->console.println("Starting measurements.");
     this->opMode = OpMode::MEASUREMENTS;
   } else {
     // setup configurator in case of upload connection failure
     this->console.println();
-    this->console.println("Data link error - setting up configurator...");
+    this->console.println(
+        "Error setting up upload data links - starting configurator...");
 
     if (this->configurator->start()) {
       this->opMode = OpMode::CONFIG;
     } else {
-      this->console.println("There is no way to configure the device.");
+      this->console.println(
+          "Fatal error - there is no way to configure the device!");
       this->opMode = OpMode::RESTART;
       ifSetupOk = false;
     }
@@ -207,9 +182,14 @@ bool Application::setup() {
 void Application::loop(unsigned long loopEnterMillis) {
   switch (this->opMode) {
     case OpMode::MEASUREMENTS:
-      // deal with WiFi first not to delay upload after measurements
+      // deal with connections first not to delay uploads after measurements
       {
-        bool linkReady = this->uploadLinkReady();
+        bool anyLinkActive = false;
+        for (auto uploader : this->uploaderSet) {
+          if (uploader->uploadLinkSetup()) {
+            anyLinkActive = true;
+          }
+        }
 
         // collect measurements
         for (auto sensor : this->sensorSet) {
@@ -220,11 +200,11 @@ void Application::loop(unsigned long loopEnterMillis) {
           }
         }
 
-        if (!linkReady) {
-          this->console.println("Can't upload data due to WiFi link down.");
+        if (!anyLinkActive) {
+          this->console.println("Can't upload data due to upload links down.");
         }
 
-        if (!this->logAndUpload(linkReady)) {
+        if (!this->logAndUpload(anyLinkActive)) {
           this->console.println("Error on data logging/uploading.");
         }
 
