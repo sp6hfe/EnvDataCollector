@@ -22,7 +22,7 @@ sensors::SensorPressureRaw sensorPressureRaw(bme280, "BME280 pres", "hPa",
                                              "pressure_raw");
 
 /* uploaders */
-uploaders::HttpUploader httpUploader(Serial, esp8266Core, esp8266Core, "http");
+uploaders::HttpUploader httpUploader(Serial, esp8266Core, "http");
 
 /* configurator */
 configurators::WebConfigurator webConfigurator(Serial, esp8266Core,

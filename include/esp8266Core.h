@@ -5,7 +5,6 @@
 #include <ESP8266WiFi.h>
 #include <Stream.h>
 
-#include "IHttp.h"
 #include "ISystem.h"
 #include "IWebServer.h"
 #include "IWiFi.h"
@@ -14,8 +13,7 @@ namespace wrappers {
 
 class ESP8266Core : public interfaces::ISystem,
                     public interfaces::IWiFi,
-                    public interfaces::IWebServer,
-                    public interfaces::IHttp {
+                    public interfaces::IWebServer {
  private:
   Stream &console;
   WiFiClient wifi_client;
@@ -24,11 +22,9 @@ class ESP8266Core : public interfaces::ISystem,
 
  public:
   /* System */
-
   void restart() override { ESP.restart(); }
 
   /* WiFi */
-
   void wifiBegin() override {
     // cleaning after previous configuration that may be still active
     WiFi.disconnect();
@@ -63,7 +59,6 @@ class ESP8266Core : public interfaces::ISystem,
   IPAddress apGetIp() override { return WiFi.softAPIP(); }
 
   /* Web Server */
-
   void webserverBegin() override { this->web_server.begin(); }
 
   void webserverRegisterPage(const char *uri,
@@ -83,7 +78,6 @@ class ESP8266Core : public interfaces::ISystem,
   void webserverPerform() override { this->web_server.handleClient(); }
 
   /* HTTP client */
-
   bool httpBegin(const String &url) override {
     return this->http_client.begin(this->wifi_client, url);
   }
