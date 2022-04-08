@@ -2,25 +2,42 @@
 
 using namespace application;
 
-bool Application::logAndUpload(bool uploadAllowed) {
-  bool anyNewMeasurement = false;
-  bool logAndUploadResult = false;
+Application::StackedExecutionResult Application::gatherData(
+    unsigned long dataGatheringEnterMillis) {
+  StackedExecutionResult result = StackedExecutionResult::FAILED;
 
-  for (auto uploader : this->uploaderSet) {
-    uploader->clearData();
+  auto gatheredDataCount = 0;
+
+  for (auto sensor : this->sensorSet) {
+    if (sensor->measure(dataGatheringEnterMillis)) {
+      gatheredDataCount++;
+    } else {
+      this->console.print("Error gathering data from \"");
+      this->console.print(sensor->getName());
+      this->console.println("\" source.");
+    }
   }
 
-  this->console.println();
-  this->console.print("New measurements:");
+  if (gatheredDataCount > 0) {
+    if (gatheredDataCount == this->sensorSet.size()) {
+      result = StackedExecutionResult::OK;
+    } else {
+      result = StackedExecutionResult::SOME_FAILED;
+    }
+  }
+
+  return result;
+}
+
+void Application::logData() {
+  bool anyNewDataAvailable = false;
 
   for (auto sensor : this->sensorSet) {
     if (sensor->newData()) {
-      // assumption here is that we want to upload only new measurements and
-      // newValue() returns false after first readout with getValue()
-      if (uploadAllowed) {
-        for (auto uploader : this->uploaderSet) {
-          uploader->addData(sensor->getDataId(), sensor->getData());
-        }
+      if (!anyNewDataAvailable) {
+        anyNewDataAvailable = true;
+        this->console.println();
+        this->console.print("New data gathered:");
       }
 
       this->console.println();
@@ -30,22 +47,49 @@ bool Application::logAndUpload(bool uploadAllowed) {
       this->console.print("[");
       this->console.print(sensor->getUnit());
       this->console.print("]");
+    }
+  }
+
+  if (!anyNewDataAvailable) {
+    this->console.println();
+    this->console.print("No new data was gathered.");
+  }
+}
+
+Application::StackedExecutionResult Application::uploadData() {
+  StackedExecutionResult result = StackedExecutionResult::FAILED;
+  bool anyNewMeasurement = false;
+  auto succeededUploads = 0;
+
+  // clead data and establish upload links
+  bool anyUploaderActive = false;
+  for (auto uploader : this->uploaderSet) {
+    uploader->clearData();
+    if (uploader->uploadLinkSetup()) {
+      anyUploaderActive = true;
+    }
+  }
+
+  if (!anyUploaderActive) {
+    return result;
+  }
+
+  for (auto sensor : this->sensorSet) {
+    if (sensor->newData()) {
+      for (auto uploader : this->uploaderSet) {
+        uploader->addData(sensor->getDataId(), sensor->getData());
+      }
       anyNewMeasurement = true;
     }
   }
 
-  if (!anyNewMeasurement) {
-    // nothing to log/upload
-    this->console.println(" no new measurements - check log for errors.");
-  } else if (uploadAllowed) {
+  if (anyNewMeasurement) {
     this->console.println();
-    // new logged measurements queued for upload
-    auto succeededUploads = 0;
+    // upload queued data
     for (auto uploader : this->uploaderSet) {
       if (uploader->upload()) {
         succeededUploads++;
         this->console.print("(+) Data uploaded");
-        logAndUploadResult = true;
       } else {
         this->console.print("(-) Error uploading");
       }
@@ -53,19 +97,23 @@ bool Application::logAndUpload(bool uploadAllowed) {
       this->console.print(uploader->getName());
       this->console.println("\".");
     }
-    // success if any data went through
-    if (succeededUploads) {
-      logAndUploadResult = true;
+
+    if (succeededUploads > 0) {
+      if (succeededUploads == this->uploaderSet.size()) {
+        result = StackedExecutionResult::OK;
+      } else {
+        result = StackedExecutionResult::SOME_FAILED;
+      }
     }
   } else {
-    // new measurements logged
-    logAndUploadResult = true;
+    // nothing to upload (should be detected earlier)
+    this->console.println(" no new measurements - check log for errors.");
   }
 
-  return logAndUploadResult;
+  return result;
 }
 
-bool Application::registerSensor(interfaces::ISensor *newSensor) {
+bool Application::registerSensor(interfaces::ISensor* newSensor) {
   bool ifSensorRegistered = false;
 
   if (newSensor) {
@@ -87,7 +135,7 @@ bool Application::registerSensor(interfaces::ISensor *newSensor) {
   return ifSensorRegistered;
 }
 
-bool Application::registerUploader(interfaces::IDataUploader *newUploader) {
+bool Application::registerUploader(interfaces::IDataUploader* newUploader) {
   bool ifUploaderRegistered = false;
 
   if (newUploader) {
@@ -109,8 +157,19 @@ bool Application::registerUploader(interfaces::IDataUploader *newUploader) {
   return ifUploaderRegistered;
 }
 
+bool Application::registerUi(interfaces::IUi* newUi) {
+  bool ifUiRegistered = false;
+
+  if (newUi) {
+    this->ui = newUi;
+    ifUiRegistered = true;
+  }
+
+  return ifUiRegistered;
+}
+
 bool Application::registerConfigurator(
-    interfaces::IConfigurator *newConfigurator) {
+    interfaces::IConfigurator* newConfigurator) {
   bool ifConfiguratorRegistered = false;
 
   if (newConfigurator) {
@@ -139,7 +198,7 @@ bool Application::setup() {
   // init all sensors
   for (auto sensor : this->sensorSet) {
     if (sensor->init()) {
-      this->console.print("Sensor \"");
+      this->console.print("Data source \"");
       this->console.print(sensor->getName());
       this->console.println("\" initialized.");
     } else {
@@ -158,8 +217,8 @@ bool Application::setup() {
   }
 
   if (anyUploaderConnectionWorked) {
-    this->console.println("Starting measurements.");
-    this->opMode = OpMode::MEASUREMENTS;
+    this->console.println("Starting data gathering.");
+    this->opMode = OpMode::DATA_GATHERING;
   } else {
     // setup configurator in case of upload connection failure
     this->console.println();
@@ -181,45 +240,69 @@ bool Application::setup() {
 
 void Application::loop(unsigned long loopEnterMillis) {
   switch (this->opMode) {
-    case OpMode::MEASUREMENTS:
-      // deal with connections first not to delay uploads after measurements
+    case OpMode::DATA_GATHERING:
+      // data gathering from all sources
       {
-        bool anyLinkActive = false;
-        for (auto uploader : this->uploaderSet) {
-          if (uploader->uploadLinkSetup()) {
-            anyLinkActive = true;
+        this->lastDataGatheringMillis = loopEnterMillis;
+
+        if (this->ui) {
+          this->ui->setState(interfaces::UiDeviceState::DATA_GATHERING);
+        }
+
+        auto status = this->gatherData(loopEnterMillis);
+        if (status == StackedExecutionResult::FAILED) {
+          if (this->ui) {
+            this->ui->setState(interfaces::UiDeviceState::ERROR);
           }
+          this->opMode = OpMode::IDLE;
+        } else {
+          this->opMode = OpMode::DATA_LOGGING;
+        }
+      }
+      break;
+    case OpMode::DATA_LOGGING:
+      // each collected data to be logged
+      this->logData();
+      this->opMode = OpMode::DATA_UPLOADING;
+      break;
+    case OpMode::DATA_UPLOADING:
+      // gathered data uploading via all routes
+      {
+        auto uploadResult = this->uploadData();
+
+        switch (uploadResult) {
+          case StackedExecutionResult::FAILED:
+            this->console.println(
+                "Can't upload data due missing uploading routes.");
+            break;
+          case StackedExecutionResult::SOME_FAILED:
+            this->console.println("Data was not uploaded via all routes.");
+            break;
+          default:
+            break;
         }
 
-        // collect measurements
-        for (auto sensor : this->sensorSet) {
-          if (!sensor->measure(loopEnterMillis)) {
-            this->console.print("Error taking measurements with \"");
-            this->console.print(sensor->getName());
-            this->console.println("\" sensor.");
-          }
-        }
-
-        if (!anyLinkActive) {
-          this->console.println("Can't upload data due to upload links down.");
-        }
-
-        if (!this->logAndUpload(anyLinkActive)) {
-          this->console.println("Error on data logging/uploading.");
-        }
-
-        delay(this->interMeasurementsDelaySec * 1000);
+        this->opMode = OpMode::IDLE;
+      }
+      break;
+    case OpMode::IDLE:
+      // awaiting till next data gathering
+      if (loopEnterMillis - this->lastDataGatheringMillis >=
+          this->interMeasurementsDelaySec * 1000) {
+        this->opMode = OpMode::DATA_GATHERING;
+      } else {
+        delay(10);
       }
       break;
     case OpMode::CONFIG:
-      // handle configurator exit code
+      // configurator handling
       {
         int configuratorExitCode = this->configurator->perform();
 
         if (configuratorExitCode < 0) {
           this->opMode = OpMode::RESTART;
         } else if (configuratorExitCode == 0) {
-          this->opMode = OpMode::MEASUREMENTS;
+          this->opMode = OpMode::DATA_GATHERING;
         }
       }
       break;
